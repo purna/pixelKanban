@@ -165,25 +165,31 @@ class KanbanBoard {
         }
 
         taskElement.innerHTML = `
-            <div class="task-title-row">
-                ${task.emoji ? `<span class="task-emoji">${this.escapeHtml(task.emoji)}</span>` : ''}
-                <div class="task-title">${this.escapeHtml(task.title)}</div>
+            <div class="task-card-header">
+                <div class="task-title-row">
+                    ${task.emoji ? `<span class="task-emoji">${this.escapeHtml(task.emoji)}</span>` : ''}
+                    <div class="task-title">${this.escapeHtml(task.title)}</div>
+                </div>
             </div>
-            <div class="task-description">${this.escapeHtml(task.description)}</div>
-            ${attachmentsHTML}
-            <div class="task-meta">
-                <div class="task-assignee" ${assigneeEmail ? 'style="cursor: pointer;" data-email="' + assigneeEmail + '"' : ''}>${assigneeName}</div>
-                <div class="task-priority ${task.priority}">${task.priority}</div>
+            <div class="task-card-body">
+                <div class="task-description">${this.escapeHtml(task.description)}</div>
+                ${attachmentsHTML}
+                <div class="task-meta">
+                    <div class="task-assignee" ${assigneeEmail ? 'style="cursor: pointer;" data-email="' + assigneeEmail + '"' : ''}>${assigneeName}</div>
+                    <div class="task-priority ${task.priority}">${task.priority}</div>
+                </div>
             </div>
-            ${dueDate ? `<div class="task-due-date ${dueDateClass}">Due: ${dueDate}</div>` : ''}
-            <div class="task-created-date">Created: ${createdDate}</div>
-            <div class="task-actions">
-                <button class="task-action-btn edit" data-action="edit" title="Edit Task">
-                    <i class="fas fa-pencil-alt"></i>
-                </button>
-                <button class="task-action-btn delete" data-action="delete" title="Delete Task">
-                    <i class="fas fa-trash"></i>
-                </button>
+            <div class="task-card-footer">
+                ${dueDate ? `<div class="task-due-date ${dueDateClass}">Due: ${dueDate}</div>` : ''}
+                <div class="task-created-date">Created: ${createdDate}</div>
+                <div class="task-actions">
+                    <button class="task-action-btn edit" data-action="edit" title="Edit Task">
+                        <i class="fas fa-pencil-alt"></i>
+                    </button>
+                    <button class="task-action-btn delete" data-action="delete" title="Delete Task">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
             </div>
         `;
 
