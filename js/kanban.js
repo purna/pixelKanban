@@ -19,7 +19,6 @@ class KanbanBoard {
         this.renderBoard();
         this.setupEventListeners();
         this.setupEmailModalListeners();
-        this.setupDragAndDrop();
         this.setupMessagesSidebarListeners();
     }
 
@@ -29,6 +28,7 @@ class KanbanBoard {
             id: this.nextTaskId++,
             title: data.title,
             description: data.description || '',
+            emoji: data.emoji || '',
             assignee: data.assignee || '',
             userId: data.userId || null,
             priority: data.priority || 'medium',
@@ -91,8 +91,6 @@ class KanbanBoard {
             }
         });
         
-        // Refresh drag and drop listeners
-        this.refreshDragAndDrop();
         this.updateTaskCounts();
     }
 
@@ -151,13 +149,13 @@ class KanbanBoard {
         let attachmentsHTML = '';
         if (task.attachments && task.attachments.length > 0) {
             attachmentsHTML = '<div class="task-attachments">';
-            task.attachments.forEach(att => {
+            task.attachments.forEach((att, index) => {
                 const icon = this.getAttachmentIcon(att.type);
                 const isImage = att.type === 'image';
                 const preview = isImage ? `<img src="${att.url}" alt="${att.name}" onerror="this.style.display='none'">` : '';
                 
                 attachmentsHTML += `
-                    <div class="attachment-item" onclick="kanbanBoard.openGallery('${task.id}')">
+                    <div class="attachment-item" onclick="kanbanBoard.openGallery('${task.id}', ${index})">
                         <div class="attachment-icon">${preview || '<i class="fas ' + icon + '"></i>'}</div>
                         <div class="attachment-name">${att.name || att.url}</div>
                     </div>
@@ -167,7 +165,10 @@ class KanbanBoard {
         }
 
         taskElement.innerHTML = `
-            <div class="task-title">${this.escapeHtml(task.title)}</div>
+            <div class="task-title-row">
+                ${task.emoji ? `<span class="task-emoji">${this.escapeHtml(task.emoji)}</span>` : ''}
+                <div class="task-title">${this.escapeHtml(task.title)}</div>
+            </div>
             <div class="task-description">${this.escapeHtml(task.description)}</div>
             ${attachmentsHTML}
             <div class="task-meta">
@@ -223,45 +224,214 @@ class KanbanBoard {
     }
 
     // Open gallery modal
-    openGallery(taskId) {
+    openGallery(taskId, attachmentIndex = 0) {
         const task = this.tasks.find(t => t.id == taskId);
         if (!task || !task.attachments || task.attachments.length === 0) return;
+        
+        this.currentGalleryTaskId = taskId;
+        this.currentGalleryIndex = attachmentIndex;
         
         const modal = document.getElementById('gallery-modal');
         const content = document.getElementById('gallery-content');
         const title = document.getElementById('gallery-modal-title');
+        const prevBtn = document.getElementById('gallery-prev-btn');
+        const nextBtn = document.getElementById('gallery-next-btn');
         
         title.textContent = `Attachments: ${task.title}`;
         
-        let html = '<div class="gallery-grid">';
-        task.attachments.forEach(url => {
-            const isVideo = this.isVideoUrl(url);
-            
-            if (isVideo) {
-                html += `<div class="gallery-item">
-                    <div class="gallery-video">
-                        <a href="${url}" target="_blank">
-                            <i class="fas fa-video"></i>
-                            <span>${this.escapeHtml(url)}</span>
-                        </a>
-                    </div>
-                </div>`;
-            } else {
-                html += `<div class="gallery-item">
-                    <a href="${url}" target="_blank">
-                        <img src="${url}" alt="Attachment" onerror="this.outerHTML='<div class=\"gallery-error\"><i class=\"fas fa-image\"></i></div>';">
-                    </a>
-                </div>`;
-            }
-        });
-        html += '</div>';
+        // Show/hide navigation buttons based on attachment count
+        if (task.attachments.length > 1) {
+            if (prevBtn) prevBtn.style.display = 'flex';
+            if (nextBtn) nextBtn.style.display = 'flex';
+        } else {
+            if (prevBtn) prevBtn.style.display = 'none';
+            if (nextBtn) nextBtn.style.display = 'none';
+        }
         
-        content.innerHTML = html;
+        this.renderGalleryAttachment(task, attachmentIndex);
         modal.classList.add('active');
     }
 
+    // Render a single gallery attachment
+    renderGalleryAttachment(task, index) {
+        const content = document.getElementById('gallery-content');
+        const counter = document.getElementById('gallery-counter');
+        
+        if (!task.attachments[index]) return;
+        
+        const att = task.attachments[index];
+        const isYouTube = this.isYouTubeUrl(att.url);
+        const isVimeo = this.isVimeoUrl(att.url);
+        const isVideo = this.isVideoUrl(att.url) || isYouTube || isVimeo;
+        const isImage = att.type === 'image';
+        const isAudio = att.type === 'audio';
+        
+        // Update counter
+        if (counter) {
+            counter.textContent = `${index + 1} / ${task.attachments.length}`;
+        }
+        
+        let html = '';
+        
+        if (isYouTube) {
+            // YouTube embed
+            const videoId = this.getYouTubeVideoId(att.url);
+            html = `<div class="gallery-preview">
+                <div class="gallery-video-player">
+                    <iframe 
+                        src="https://www.youtube.com/embed/${videoId}" 
+                        frameborder="0" 
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                        allowfullscreen
+                        style="width: 100%; max-width: 800px; aspect-ratio: 16/9;">
+                    </iframe>
+                </div>
+                <div class="gallery-info">
+                    <h4>${this.escapeHtml(att.name || 'YouTube Video')}</h4>
+                    <a href="${att.url}" target="_blank" class="btn btn-sm">Open on YouTube</a>
+                </div>
+            </div>`;
+        } else if (isVimeo) {
+            // Vimeo embed
+            const videoId = this.getVimeoVideoId(att.url);
+            html = `<div class="gallery-preview">
+                <div class="gallery-video-player">
+                    <iframe 
+                        src="https://player.vimeo.com/video/${videoId}" 
+                        frameborder="0" 
+                        allow="autoplay; fullscreen; picture-in-picture" 
+                        allowfullscreen
+                        style="width: 100%; max-width: 800px; aspect-ratio: 16/9;">
+                    </iframe>
+                </div>
+                <div class="gallery-info">
+                    <h4>${this.escapeHtml(att.name || 'Vimeo Video')}</h4>
+                    <a href="${att.url}" target="_blank" class="btn btn-sm">Open on Vimeo</a>
+                </div>
+            </div>`;
+        } else if (isVideo) {
+            // Video player for direct video files
+            html = `<div class="gallery-preview">
+                <div class="gallery-video-player">
+                    <video controls autoplay style="max-width: 100%; max-height: 60vh;">
+                        <source src="${att.url}" type="video/${this.getVideoType(att.url)}">
+                        Your browser does not support the video tag.
+                    </video>
+                </div>
+                <div class="gallery-info">
+                    <h4>${this.escapeHtml(att.name || 'Video')}</h4>
+                    <a href="${att.url}" target="_blank" class="btn btn-sm">Open in New Tab</a>
+                </div>
+            </div>`;
+        } else if (isAudio) {
+            // Audio player
+            html = `<div class="gallery-preview">
+                <div class="gallery-audio-player">
+                    <div class="audio-icon"><i class="fas fa-music"></i></div>
+                    <audio controls style="width: 100%;">
+                        <source src="${att.url}">
+                        Your browser does not support the audio tag.
+                    </audio>
+                </div>
+                <div class="gallery-info">
+                    <h4>${this.escapeHtml(att.name || 'Audio')}</h4>
+                    <a href="${att.url}" target="_blank" class="btn btn-sm">Open in New Tab</a>
+                </div>
+            </div>`;
+        } else if (isImage) {
+            // Image preview
+            html = `<div class="gallery-preview">
+                <div class="gallery-image-preview">
+                    <img src="${att.url}" alt="${this.escapeHtml(att.name)}" onerror="this.parentHTML='<div class=\"gallery-error\"><i class=\"fas fa-image\"></i><p>Image failed to load</p></div>';">
+                </div>
+                <div class="gallery-info">
+                    <h4>${this.escapeHtml(att.name || 'Image')}</h4>
+                    <a href="${att.url}" target="_blank" class="btn btn-sm">Open Original</a>
+                </div>
+            </div>`;
+        } else {
+            // Generic file link
+            html = `<div class="gallery-preview">
+                <div class="gallery-generic-preview">
+                    <i class="fas fa-file"></i>
+                    <p>${this.escapeHtml(att.name || att.url)}</p>
+                </div>
+                <div class="gallery-info">
+                    <a href="${att.url}" target="_blank" class="btn btn-sm">Open File</a>
+                </div>
+            </div>`;
+        }
+        
+        content.innerHTML = html;
+    }
+
+    // Check if URL is YouTube
+    isYouTubeUrl(url) {
+        return url.includes('youtube.com') || url.includes('youtu.be') || url.includes('youtube.be');
+    }
+
+    // Get YouTube video ID
+    getYouTubeVideoId(url) {
+        const regExp = /^.*(youtu.be\/|v\/|u\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        if (match && match[2].length === 11) {
+            return match[2];
+        }
+        // Handle youtu.be short links
+        if (url.includes('youtu.be/')) {
+            return url.split('youtu.be/')[1].split('?')[0];
+        }
+        return null;
+    }
+
+    // Check if URL is Vimeo
+    isVimeoUrl(url) {
+        return url.includes('vimeo.com');
+    }
+
+    // Get Vimeo video ID
+    getVimeoVideoId(url) {
+        const regExp = /vimeo.com\/(?:channels\/(?:\w+\/)?|groups\/(?:[^\/]*)\/videos\/|album\/(?:\d+)\/video\/|video\/|)(\d+)/;
+        const match = url.match(regExp);
+        if (match && match[1]) {
+            return match[1];
+        }
+        return null;
+    }
+
+    // Navigate to previous attachment
+    galleryPrev() {
+        if (!this.currentGalleryTaskId) return;
+        const task = this.tasks.find(t => t.id == this.currentGalleryTaskId);
+        if (!task || !task.attachments) return;
+        
+        this.currentGalleryIndex = (this.currentGalleryIndex - 1 + task.attachments.length) % task.attachments.length;
+        this.renderGalleryAttachment(task, this.currentGalleryIndex);
+    }
+
+    // Navigate to next attachment
+    galleryNext() {
+        if (!this.currentGalleryTaskId) return;
+        const task = this.tasks.find(t => t.id == this.currentGalleryTaskId);
+        if (!task || !task.attachments) return;
+        
+        this.currentGalleryIndex = (this.currentGalleryIndex + 1) % task.attachments.length;
+        this.renderGalleryAttachment(task, this.currentGalleryIndex);
+    }
+
+    // Get video type from URL
+    getVideoType(url) {
+        if (url.includes('.mp4')) return 'mp4';
+        if (url.includes('.webm')) return 'webm';
+        if (url.includes('.ogg')) return 'ogg';
+        return 'mp4';
+    }
+
+    // Close gallery modal
     closeGalleryModal() {
         document.getElementById('gallery-modal').classList.remove('active');
+        this.currentGalleryTaskId = null;
+        this.currentGalleryIndex = 0;
     }
 
     // Get user email by ID
@@ -342,6 +512,7 @@ class KanbanBoard {
 
         if (task) {
             title.textContent = 'Edit Task';
+            document.getElementById('task-emoji').value = task.emoji || '';
             document.getElementById('task-title').value = task.title;
             document.getElementById('task-description').value = task.description;
             document.getElementById('task-assignee').value = task.assignee;
@@ -366,7 +537,41 @@ class KanbanBoard {
         this.setupAttachmentListeners();
         this.setupCommentListeners();
         this.setupColorPickerListeners();
+        this.setupEmojiPickerListeners();
         modal.classList.add('active');
+    }
+
+    // Setup emoji picker listeners
+    setupEmojiPickerListeners() {
+        const emojiInput = document.getElementById('task-emoji');
+        const emojiDropdown = document.querySelector('.emoji-picker-dropdown');
+        
+        if (!emojiInput || !emojiDropdown) return;
+        
+        // Toggle dropdown on input focus/click
+        emojiInput.addEventListener('focus', () => {
+            emojiDropdown.classList.add('active');
+        });
+        
+        emojiInput.addEventListener('click', () => {
+            emojiDropdown.classList.add('active');
+        });
+        
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!emojiInput.contains(e.target) && !emojiDropdown.contains(e.target)) {
+                emojiDropdown.classList.remove('active');
+            }
+        });
+        
+        // Handle emoji selection
+        emojiDropdown.querySelectorAll('.emoji-option').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const emoji = btn.dataset.emoji;
+                emojiInput.value = emoji;
+                emojiDropdown.classList.remove('active');
+            });
+        });
     }
 
     // Setup color picker listeners
@@ -416,6 +621,18 @@ class KanbanBoard {
                 </div>
                 <button type="button" class="btn btn-sm remove-attachment" data-index="${index}"><i class="fas fa-times"></i></button>
             `;
+            
+            // Add click handler for preview
+            item.style.cursor = 'pointer';
+            item.onclick = (e) => {
+                if (!e.target.closest('.remove-attachment')) {
+                    // Find the task this attachment belongs to
+                    const task = this.tasks.find(t => t.id === this.currentTaskId);
+                    if (task) {
+                        this.openGallery(task.id, index);
+                    }
+                }
+            };
             
             container.appendChild(item);
         });
@@ -1029,6 +1246,7 @@ class KanbanBoard {
         
         // Get form values directly
         const taskData = {
+            emoji: document.getElementById('task-emoji').value,
             title: document.getElementById('task-title').value,
             description: document.getElementById('task-description').value,
             assignee: document.getElementById('task-assignee').value,
@@ -1114,106 +1332,6 @@ class KanbanBoard {
         return 'Unassigned';
     }
 
-    // Drag and Drop - Fixed version
-    setupDragAndDrop() {
-        // Set up drag events for all task cards
-        document.addEventListener('dragstart', this.handleDragStart.bind(this));
-        document.addEventListener('dragend', this.handleDragEnd.bind(this));
-
-        // Set up drop zones for all columns
-        const columns = document.querySelectorAll('.column-content');
-        columns.forEach(column => {
-            column.addEventListener('dragover', this.handleDragOver.bind(this));
-            column.addEventListener('dragleave', this.handleDragLeave.bind(this));
-            column.addEventListener('drop', this.handleDrop.bind(this));
-        });
-
-        // Re-add drag listeners to task cards
-        this.updateTaskCardListeners();
-    }
-
-    // Update task card drag listeners
-    updateTaskCardListeners() {
-        const taskCards = document.querySelectorAll('.task-card');
-        taskCards.forEach(card => {
-            card.addEventListener('dragstart', this.handleDragStart.bind(this));
-            card.addEventListener('dragend', this.handleDragEnd.bind(this));
-            card.addEventListener('dragover', this.handleTaskDragOver.bind(this));
-        });
-    }
-
-    handleDragStart(e) {
-        // Only handle if it's a task card
-        if (!e.target.classList.contains('task-card')) return;
-        
-        e.dataTransfer.setData('text/plain', e.target.dataset.taskId);
-        e.dataTransfer.effectAllowed = 'move';
-        e.target.classList.add('dragging');
-    }
-
-    handleDragEnd(e) {
-        if (!e.target.classList.contains('task-card')) return;
-        e.target.classList.remove('dragging');
-
-        // Remove all drag-over classes
-        document.querySelectorAll('.drag-over').forEach(el => {
-            el.classList.remove('drag-over');
-        });
-    }
-
-    handleDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-
-        const column = e.currentTarget;
-        if (column.classList.contains('column-content')) {
-            column.classList.add('drag-over');
-        }
-    }
-
-    handleTaskDragOver(e) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    }
-
-    handleDragLeave(e) {
-        const column = e.currentTarget;
-        if (column.classList.contains('column-content')) {
-            // Only remove if we're actually leaving the column
-            if (!column.contains(e.relatedTarget)) {
-                column.classList.remove('drag-over');
-            }
-        }
-    }
-
-    handleDrop(e) {
-        e.preventDefault();
-
-        const column = e.currentTarget;
-        column.classList.remove('drag-over');
-
-        const taskId = parseInt(e.dataTransfer.getData('text/plain'));
-        if (!taskId) return;
-
-        // Determine new status from column ID
-        let newStatus;
-        if (column.classList.contains('column-content')) {
-            newStatus = column.id.replace('-tasks', '');
-        } else {
-            return;
-        }
-
-        // Move task to new status
-        if (taskId && newStatus) {
-            this.moveTask(taskId, newStatus);
-        }
-    }
-
-    // Re-render after drag and drop
-    refreshDragAndDrop() {
-        this.updateTaskCardListeners();
-    }
-
     // Event Listeners
     setupEventListeners() {
         // Add task buttons - now use inline creation
@@ -1280,6 +1398,18 @@ class KanbanBoard {
         if (galleryClose) {
             galleryClose.addEventListener('click', () => this.closeGalleryModal());
         }
+        
+        // Gallery keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            const galleryModal = document.getElementById('gallery-modal');
+            if (!galleryModal || !galleryModal.classList.contains('active')) return;
+            
+            if (e.key === 'ArrowLeft') {
+                this.galleryPrev();
+            } else if (e.key === 'ArrowRight') {
+                this.galleryNext();
+            }
+        });
     }
 
     // Data Persistence

@@ -372,12 +372,90 @@ header {
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
 }
 
+/* Task Emoji */
+.task-emoji {
+    font-size: 1.5rem;
+    margin-right: 8px;
+    flex-shrink: 0;
+}
+
+/* Task Title Row - Container for emoji and title */
+.task-title-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Emoji Picker */
+.emoji-picker-container {
+    position: relative;
+    display: flex;
+    gap: 8px;
+}
+
+.emoji-input {
+    flex: 1;
+    padding: 0.75rem;
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    font-size: 1.2rem;
+    text-align: center;
+    width: 80px;
+}
+
+.emoji-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.1);
+}
+
+.emoji-picker-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    margin-top: 4px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 8px;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 4px;
+    z-index: 100;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.emoji-picker-dropdown.active {
+    display: grid;
+}
+
+.emoji-option {
+    width: 36px;
+    height: 36px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    background: transparent;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.emoji-option:hover {
+    background: var(--bg-medium);
+    border-color: var(--accent-primary);
+}
+
 .task-title {
     font-weight: 600;
     font-size: 0.95rem;
     margin-bottom: 6px;
     color: var(--text-primary);
     padding-right: 60px;
+    display: flex;
+    align-items: center;
 }
 
 .task-description {
@@ -614,8 +692,11 @@ header {
 /* Attachments list in modal */
 .attachments-list {
     margin-bottom: 12px;
-    max-height: 150px;
+    max-height: 200px;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
 .attachments-list .attachment-item {
@@ -625,8 +706,14 @@ header {
     padding: 8px 12px;
     background: var(--bg-light);
     border: 1px solid var(--border-color);
-    border-radius: 4px;
-    margin-bottom: 6px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.attachments-list .attachment-item:hover {
+    border-color: var(--accent-primary);
+    background: rgba(0, 255, 65, 0.05);
 }
 
 .attachments-list .attachment-preview {
@@ -1094,6 +1181,157 @@ header {
     padding: 10px 0;
 }
 
+/* Gallery Navigation */
+.gallery-nav {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    padding: 10px 20px;
+    background: var(--bg-light);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.gallery-nav #gallery-prev-btn,
+.gallery-nav #gallery-next-btn {
+    background: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gallery-nav #gallery-prev-btn:hover,
+.gallery-nav #gallery-next-btn:hover {
+    background: var(--accent-primary);
+    color: var(--bg-dark);
+    border-color: var(--accent-primary);
+}
+
+.gallery-counter {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+/* Gallery Preview */
+.gallery-preview {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.gallery-image-preview {
+    max-width: 100%;
+    max-height: 60vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.gallery-image-preview img {
+    max-width: 100%;
+    max-height: 60vh;
+    object-fit: contain;
+}
+
+.gallery-video-player,
+.gallery-audio-player {
+    width: 100%;
+    max-width: 800px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+}
+
+.gallery-video-player iframe,
+.gallery-video-player video {
+    width: 100%;
+    aspect-ratio: 16/9;
+    border-radius: 4px;
+    background: #000;
+}
+
+.gallery-audio-player {
+    padding: 40px 20px;
+}
+
+.audio-icon {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: var(--accent-primary);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 10px;
+}
+
+.audio-icon i {
+    font-size: 2rem;
+    color: var(--bg-dark);
+}
+
+.gallery-generic-preview {
+    width: 100%;
+    max-width: 400px;
+    padding: 60px 20px;
+    background: var(--bg-dark);
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    text-align: center;
+}
+
+.gallery-generic-preview i {
+    font-size: 3rem;
+    color: var(--accent-tertiary);
+}
+
+.gallery-generic-preview p {
+    color: var(--text-secondary);
+    word-break: break-all;
+}
+
+.gallery-info {
+    text-align: center;
+}
+
+.gallery-info h4 {
+    color: var(--text-primary);
+    margin-bottom: 10px;
+    font-size: 1rem;
+}
+
+.gallery-info .btn {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+}
+
+.gallery-info .btn:hover {
+    background: var(--accent-primary);
+    color: var(--bg-dark);
+    border-color: var(--accent-primary);
+}
+
+/* Old gallery styles - kept for compatibility */
 .gallery-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
@@ -1414,4 +1652,24 @@ header {
 
 .task-priority.urgent {
     background: #6f42c1;
+}
+
+/* App Footer */
+.app-footer {
+    background: var(--bg-dark);
+    border-top: 1px solid var(--border-color);
+    padding: 16px 24px;
+    text-align: center;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 100;
+}
+
+.app-footer p {
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
 }

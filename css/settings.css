@@ -786,3 +786,116 @@
     font-weight: 900;
     font-size: 0.9rem;
 }
+
+/* =============================================
+    13. ROLES LIST STYLES
+    ============================================= */
+
+.roles-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.role-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.role-item:hover {
+    border-color: var(--accent-primary);
+    background: var(--bg-medium);
+}
+
+.role-item.new-role-item {
+    background: var(--bg-medium);
+    border-style: dashed;
+}
+
+.role-item.new-role-item:hover {
+    border-style: solid;
+}
+
+.new-role-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.new-role-input:focus {
+    outline: none;
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.1);
+}
+
+.new-role-input::placeholder {
+    color: var(--text-secondary);
+    font-weight: 400;
+}
+
+.role-name-container {
+    flex: 1;
+    margin-right: 12px;
+}
+
+.role-name-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+.role-name-input:focus {
+    outline: none;
+    background: var(--bg-dark);
+    border-color: var(--accent-primary);
+    box-shadow: 0 0 0 3px rgba(0, 255, 65, 0.1);
+}
+
+.role-name-input:hover {
+    background: var(--bg-dark);
+    border-color: var(--border-color);
+}
+
+.role-item-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.role-item-actions .btn {
+    padding: 6px 10px;
+    background: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+}
+
+.role-item-actions .btn:hover {
+    background: var(--accent-primary);
+    color: var(--bg-dark);
+    border-color: var(--accent-primary);
+}
+
+.role-item-actions .delete-role-btn:hover {
+    background: var(--accent-secondary);
+    color: white;
+    border-color: var(--accent-secondary);
+}

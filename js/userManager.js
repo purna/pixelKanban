@@ -7,13 +7,100 @@ class UserManager {
         this.nextUserId = 1;
         this.currentUserId = null; // Track current logged in user
         this.firebaseUser = null; // Track Firebase user
+        this.roles = ['Developer', 'Designer', 'Manager', 'QA']; // Default roles
         this.init();
     }
 
     init() {
+        this.loadRoles();
         this.loadUsers();
         this.setupFirebaseAuth();
         this.setupEventListeners();
+    }
+
+    // ========== ROLES MANAGEMENT ==========
+    
+    // Load roles from localStorage
+    loadRoles() {
+        const savedRoles = localStorage.getItem('kanban-roles');
+        if (savedRoles) {
+            this.roles = JSON.parse(savedRoles);
+        }
+    }
+
+    // Save roles to localStorage
+    saveRoles() {
+        localStorage.setItem('kanban-roles', JSON.stringify(this.roles));
+    }
+
+    // Create a new role
+    createRole(name) {
+        if (this.roles.includes(name)) {
+            this.showNotification('Role already exists', 'error');
+            return false;
+        }
+        this.roles.push(name);
+        this.saveRoles();
+        this.showNotification('Role created successfully', 'success');
+        return true;
+    }
+
+    // Update an existing role
+    updateRole(oldName, newName) {
+        const index = this.roles.indexOf(oldName);
+        if (index === -1) {
+            this.showNotification('Role not found', 'error');
+            return false;
+        }
+        if (this.roles.includes(newName) && newName !== oldName) {
+            this.showNotification('Role name already exists', 'error');
+            return false;
+        }
+        this.roles[index] = newName;
+        this.saveRoles();
+        this.showNotification('Role updated successfully', 'success');
+        return true;
+    }
+
+    // Delete a role
+    deleteRole(name) {
+        // Check if any users have this role
+        const usersWithRole = this.users.filter(u => u.role === name);
+        if (usersWithRole.length > 0) {
+            if (!confirm(`${usersWithRole.length} user(s) have this role. Are you sure you want to delete it? These users will need their roles reassigned.`)) {
+                return false;
+            }
+            // Update users with this role to first available role
+            const newRole = this.roles.find(r => r !== name) || '';
+            usersWithRole.forEach(user => {
+                user.role = newRole;
+            });
+            this.saveUsers();
+        }
+        this.roles = this.roles.filter(r => r !== name);
+        this.saveRoles();
+        this.showNotification('Role deleted successfully', 'success');
+        return true;
+    }
+
+    // Get all roles
+    getRoles() {
+        return [...this.roles];
+    }
+
+    // Populate role dropdown
+    populateRoleDropdown(selectElement, selectedRole = '') {
+        if (!selectElement) return;
+        selectElement.innerHTML = '';
+        this.roles.forEach(role => {
+            const option = document.createElement('option');
+            option.value = role;
+            option.textContent = role;
+            if (role === selectedRole) {
+                option.selected = true;
+            }
+            selectElement.appendChild(option);
+        });
     }
 
     // Firebase Authentication Setup
@@ -226,16 +313,18 @@ class UserManager {
         const modal = document.getElementById('user-modal');
         const form = document.getElementById('user-form');
         const title = document.getElementById('user-modal-title');
+        const roleSelect = document.getElementById('user-role');
 
         if (user) {
             title.textContent = 'Edit User';
             document.getElementById('user-name').value = user.name;
             document.getElementById('user-email').value = user.email;
-            document.getElementById('user-role').value = user.role;
+            this.populateRoleDropdown(roleSelect, user.role);
             form.dataset.userId = user.id;
         } else {
             title.textContent = 'Add User';
             form.reset();
+            this.populateRoleDropdown(roleSelect);
             delete form.dataset.userId;
         }
 

@@ -58,8 +58,189 @@ class SettingsManager {
         this.loadDefaultUser();
         this.renderBoardsList();
         this.renderUsersList();
+        this.renderRolesList();
         this.renderPanelConfig();
         this.renderDefaultUserSelect();
+    }
+
+    // ========== ROLES MANAGEMENT ==========
+
+    // Render roles list
+    renderRolesList() {
+        const container = document.getElementById('roles-list');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        const roles = this.userManager ? this.userManager.getRoles() : ['Developer', 'Designer', 'Manager', 'QA'];
+
+        // Add new role input at the top
+        const newRoleItem = document.createElement('div');
+        newRoleItem.className = 'role-item new-role-item';
+        newRoleItem.innerHTML = `
+            <div class="role-name-container">
+                <input type="text" class="role-name-input new-role-input" placeholder="Add a new role..." maxlength="30">
+            </div>
+            <div class="role-item-actions">
+                <button class="btn btn-sm primary add-role-inline-btn"><i class="fas fa-plus"></i> Add</button>
+            </div>
+        `;
+        container.appendChild(newRoleItem);
+
+        // Add event listener for new role input
+        const newRoleInput = newRoleItem.querySelector('.new-role-input');
+        const addRoleBtn = newRoleItem.querySelector('.add-role-inline-btn');
+        
+        const addNewRole = () => {
+            const newRole = newRoleInput.value.trim();
+            if (newRole) {
+                if (this.userManager.createRole(newRole)) {
+                    this.renderRolesList();
+                    this.showNotification('Role added', 'success');
+                }
+            }
+        };
+        
+        newRoleInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                addNewRole();
+            } else if (e.key === 'Escape') {
+                newRoleInput.value = '';
+                newRoleInput.blur();
+            }
+        });
+        
+        addRoleBtn.addEventListener('click', addNewRole);
+
+        if (roles.length === 0) {
+            container.innerHTML += '<p class="empty-message" style="margin-top: 12px;">No roles defined yet.</p>';
+            return;
+        }
+
+        roles.forEach(role => {
+            const item = document.createElement('div');
+            item.className = 'role-item';
+            item.dataset.role = role;
+
+            item.innerHTML = `
+                <div class="role-name-container">
+                    <input type="text" class="role-name-input" value="${this.escapeHtml(role)}" data-original-role="${this.escapeHtml(role)}">
+                </div>
+                <div class="role-item-actions">
+                    <button class="btn btn-sm delete-role-btn" data-role="${this.escapeHtml(role)}"><i class="fas fa-trash"></i></button>
+                </div>
+            `;
+
+            container.appendChild(item);
+        });
+
+        // Add event listeners for inline editing
+        container.querySelectorAll('.role-name-input').forEach(input => {
+            input.addEventListener('blur', (e) => {
+                const originalRole = e.target.dataset.originalRole;
+                const newRole = e.target.value.trim();
+                
+                if (newRole && newRole !== originalRole) {
+                    this.userManager.updateRole(originalRole, newRole);
+                    this.renderRolesList();
+                    // Update role dropdowns in user modals
+                    this.updateUserModalsRoles();
+                }
+            });
+            
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.target.blur();
+                } else if (e.key === 'Escape') {
+                    e.target.value = originalRole;
+                    e.target.blur();
+                }
+            });
+        });
+
+        // Add event listeners for delete buttons
+        container.querySelectorAll('.delete-role-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const role = e.target.closest('.delete-role-btn').dataset.role;
+                this.deleteRole(role);
+            });
+        });
+    }
+
+    // Update role dropdowns in user modals
+    updateUserModalsRoles() {
+        const roleSelects = document.querySelectorAll('#user-role');
+        roleSelects.forEach(select => {
+            if (window.userManager) {
+                window.userManager.populateRoleDropdown(select, select.value);
+            }
+        });
+    }
+
+    // Open role edit modal
+    openRoleEditModal(role = null) {
+        const modal = document.getElementById('role-modal');
+        const title = document.getElementById('role-modal-title');
+        const input = document.getElementById('role-name-input');
+        const hiddenInput = document.getElementById('role-original-name');
+
+        if (!modal || !title || !input) return;
+
+        if (role) {
+            title.textContent = 'Edit Role';
+            input.value = role;
+            hiddenInput.value = role;
+        } else {
+            title.textContent = 'Add Role';
+            input.value = '';
+            hiddenInput.value = '';
+        }
+
+        modal.classList.add('active');
+        input.focus();
+    }
+
+    // Close role modal
+    closeRoleModal() {
+        const modal = document.getElementById('role-modal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    }
+
+    // Save role
+    saveRole() {
+        const input = document.getElementById('role-name-input');
+        const hiddenInput = document.getElementById('role-original-name');
+
+        if (!input || !input.value.trim()) {
+            this.showNotification('Please enter a role name', 'error');
+            return;
+        }
+
+        const newName = input.value.trim();
+        const oldName = hiddenInput.value;
+
+        if (oldName) {
+            // Update existing role
+            if (this.userManager.updateRole(oldName, newName)) {
+                this.renderRolesList();
+                this.closeRoleModal();
+            }
+        } else {
+            // Create new role
+            if (this.userManager.createRole(newName)) {
+                this.renderRolesList();
+                this.closeRoleModal();
+            }
+        }
+    }
+
+    // Delete role
+    deleteRole(role) {
+        if (this.userManager.deleteRole(role)) {
+            this.renderRolesList();
+        }
     }
 
     // Default user handling
@@ -525,12 +706,41 @@ class SettingsManager {
             };
         }
 
-        // Keyboard shortcuts
+        // Role modal close
+        const roleModalClose = document.getElementById('role-modal-close');
+        if (roleModalClose) {
+            roleModalClose.onclick = () => this.closeRoleModal();
+        }
+
+        const roleCancelBtn = document.getElementById('role-cancel-btn');
+        if (roleCancelBtn) {
+            roleCancelBtn.onclick = () => this.closeRoleModal();
+        }
+
+        const roleSaveBtn = document.getElementById('role-save-btn');
+        if (roleSaveBtn) {
+            roleSaveBtn.onclick = () => this.saveRole();
+        }
+
+        // Close role modal on overlay click
+        const roleModal = document.getElementById('role-modal');
+        if (roleModal) {
+            roleModal.addEventListener('click', (e) => {
+                if (e.target.id === 'role-modal') {
+                    this.closeRoleModal();
+                }
+            });
+        }
+
+        // Keyboard shortcuts for role modal
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape') {
-                this.closeSettings();
+                this.closeRoleModal();
             }
         });
+
+        // Initialize roles tab if selected
+        this.switchTab('users');
     }
 
     // Auto-save functionality

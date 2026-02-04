@@ -95,6 +95,32 @@
             <div class="modal-content">
                 <form id="task-form">
                     <div class="form-group">
+                        <label for="task-emoji">Emoji Icon</label>
+                        <div class="emoji-picker-container">
+                            <input type="text" id="task-emoji" maxlength="2" placeholder="🎯" class="emoji-input">
+                            <div class="emoji-picker-dropdown">
+                                <button type="button" class="emoji-option" data-emoji="">🚫</button>
+                                <button type="button" class="emoji-option" data-emoji="🎯">🎯</button>
+                                <button type="button" class="emoji-option" data-emoji="📋">📋</button>
+                                <button type="button" class="emoji-option" data-emoji="✅">✅</button>
+                                <button type="button" class="emoji-option" data-emoji="⚠️">⚠️</button>
+                                <button type="button" class="emoji-option" data-emoji="🔥">🔥</button>
+                                <button type="button" class="emoji-option" data-emoji="💡">💡</button>
+                                <button type="button" class="emoji-option" data-emoji="📅">📅</button>
+                                <button type="button" class="emoji-option" data-emoji="👤">👤</button>
+                                <button type="button" class="emoji-option" data-emoji="🚀">🚀</button>
+                                <button type="button" class="emoji-option" data-emoji="📊">📊</button>
+                                <button type="button" class="emoji-option" data-emoji="🔧">🔧</button>
+                                <button type="button" class="emoji-option" data-emoji="🎨">🎨</button>
+                                <button type="button" class="emoji-option" data-emoji="📱">📱</button>
+                                <button type="button" class="emoji-option" data-emoji="💻">💻</button>
+                                <button type="button" class="emoji-option" data-emoji="📧">📧</button>
+                                <button type="button" class="emoji-option" data-emoji="💬">💬</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
                         <label for="task-title">Title</label>
                         <input type="text" id="task-title" required>
                     </div>
@@ -257,6 +283,33 @@
         </div>
     </div>
 
+    <!-- ROLE MODAL -->
+    <div class="modal-overlay" id="role-modal">
+        <div class="modal" style="max-width: 400px;">
+            <header>
+                <div class="modal-title">
+                    <i class="fas fa-tag"></i> <span id="role-modal-title">Add Role</span>
+                </div>
+                <button class="modal-close" id="role-modal-close">&times;</button>
+            </header>
+
+            <div class="modal-content">
+                <div class="form-group">
+                    <label for="role-name-input">Role Name</label>
+                    <input type="text" id="role-name-input" placeholder="Enter role name...">
+                    <input type="hidden" id="role-original-name">
+                </div>
+            </div>
+
+            <footer>
+                <div class="modal-actions">
+                    <button class="btn" id="role-cancel-btn">Cancel</button>
+                    <button class="btn primary" id="role-save-btn">Save</button>
+                </div>
+            </footer>
+        </div>
+    </div>
+
     <!-- GOOGLE SHEETS IMPORT MODAL -->
     <div class="modal-overlay" id="sheets-modal">
         <div class="modal">
@@ -323,14 +376,15 @@
             <div class="modal-content">
                 <!-- Tabs -->
                 <div class="settings-tabs">
-                    <button class="settings-tab active" data-tab="boards">Boards</button>
+                    <button class="settings-tab" data-tab="boards">Boards</button>
                     <button class="settings-tab" data-tab="users">Users</button>
+                    <button class="settings-tab active" data-tab="roles">Roles</button>
                     <button class="settings-tab" data-tab="panels">Panels</button>
                     <button class="settings-tab" data-tab="comments">Comments</button>
                 </div>
 
                 <!-- Boards Tab -->
-                <div class="settings-tab-content active" id="tab-boards">
+                <div class="settings-tab-content" id="tab-boards">
                     <h4>Board Management</h4>
                     <div class="board-actions">
                         <button class="btn" id="save-board-btn"><i class="fas fa-save"></i> Save</button>
@@ -359,6 +413,15 @@
                         </select>
                     </div>
                     <div id="users-list" class="users-list">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <!-- Roles Tab -->
+                <div class="settings-tab-content active" id="tab-roles">
+                    <h4>Roles Management</h4>
+                    <p class="settings-description">Manage roles that can be assigned to users.</p>
+                    <div id="roles-list" class="roles-list">
                         <!-- Dynamically populated -->
                     </div>
                 </div>
@@ -462,6 +525,16 @@
                 <button class="modal-close" id="gallery-modal-close">&times;</button>
             </header>
 
+            <div class="gallery-nav">
+                <button class="btn icon-only" id="gallery-prev-btn" onclick="kanbanBoard.galleryPrev()">
+                    <i class="fas fa-chevron-left"></i>
+                </button>
+                <span id="gallery-counter" class="gallery-counter"></span>
+                <button class="btn icon-only" id="gallery-next-btn" onclick="kanbanBoard.galleryNext()">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+
             <div class="modal-content">
                 <div id="gallery-content" class="gallery-content">
                     <!-- Gallery items will be populated here -->
@@ -513,6 +586,10 @@
     <script src="js/boardManager.js"></script>
     <script src="js/notifications.js"></script>
     <script src="js/settingsManager.js"></script>
+
+    <footer class="app-footer">
+        <p>Pixelagent 2026. All rights reserved.</p>
+    </footer>
 </body>
 
 </html>

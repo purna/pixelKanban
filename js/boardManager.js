@@ -212,33 +212,6 @@ class BoardManager {
                 }
             });
         }
-
-        // Export JSON button
-        const exportJsonBtn = document.getElementById('export-json-btn');
-        if (exportJsonBtn) {
-            exportJsonBtn.addEventListener('click', () => {
-                this.exportBoardJSON();
-            });
-        }
-
-        // Import JSON button
-        const importJsonBtn = document.getElementById('import-json-btn');
-        if (importJsonBtn) {
-            importJsonBtn.addEventListener('click', () => {
-                document.getElementById('import-json-input').click();
-            });
-        }
-
-        // Import JSON file input
-        const importJsonInput = document.getElementById('import-json-input');
-        if (importJsonInput) {
-            importJsonInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) {
-                    this.importBoardJSON(e.target.files[0]);
-                    e.target.value = ''; // Reset input
-                }
-            });
-        }
     }
 
     // Show notification
