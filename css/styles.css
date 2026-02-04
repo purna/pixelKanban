@@ -32,6 +32,33 @@
     --transition: all 0.2s ease;
 }
 
+/* Inter Bold Font */
+@font-face {
+    font-family: 'Inter';
+    src: url('../fonts/inter-bold.woff2') format('woff2');
+    font-weight: 700;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Inter Normal Font */
+@font-face {
+    font-family: 'Inter';
+    src: url('../fonts/inter-normal.woff2') format('woff2');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
+/* Press Start 2P Font */
+@font-face {
+    font-family: 'Press Start 2P';
+    src: url('../fonts/PressStart2P-Regular.ttf') format('truetype');
+    font-weight: 400;
+    font-style: normal;
+    font-display: swap;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -43,6 +70,7 @@ body {
     background-color: var(--bg-darkest);
     color: var(--text-primary);
     line-height: 1.6;
+    font-weight: 400;
 }
 
 /* Header */
@@ -59,16 +87,22 @@ header {
 }
 
 .logo-area h1 {
+    font-family: 'Press Start 2P', cursive;
     font-size: 1.2rem;
-    font-weight: 600;
+    font-weight: 400;
     color: var(--accent-primary);
-    background-image: linear-gradient(90deg, var(--accent-primary), var(--accent-tertiary));
-    background-size: 200%;
-    background-position: 0% 50%;
+    background: linear-gradient(90deg, var(--accent-primary), var(--accent-tertiary), var(--accent-primary));
+    background-size: 200% 100%;
     background-clip: text;
     -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: animate-background 2s infinite alternate linear;
+    color: transparent;
+    animation: shimmer 2s linear infinite;
+}
+
+@keyframes shimmer {
+    to {
+        background-position: 200% 0;
+    }
 }
 
 .badge {
