@@ -87,6 +87,61 @@ header {
     align-items: center;
 }
 
+/* User Display */
+.user-display {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 6px 12px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+}
+
+.user-photo {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--accent-primary);
+}
+
+#user-name-display {
+    font-size: 0.85rem;
+    font-weight: 500;
+    color: var(--text-primary);
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+#logout-btn {
+    padding: 4px 8px;
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: color 0.2s;
+}
+
+#logout-btn:hover {
+    color: var(--accent-secondary);
+}
+
+/* Google Login Button */
+#google-login-btn {
+    background: #4285f4;
+    border-color: #4285f4;
+    color: white;
+    font-weight: 500;
+}
+
+#google-login-btn:hover {
+    background: #357abd;
+    border-color: #357abd;
+}
+
 .btn {
     background: var(--bg-light);
     border: 1px solid var(--border-color);

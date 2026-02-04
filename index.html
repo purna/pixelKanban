@@ -23,6 +23,16 @@
         </div>
 
         <div class="header-controls">
+            <div id="user-display" class="user-display" style="display: none;">
+                <img id="user-photo" src="" alt="" class="user-photo">
+                <span id="user-name-display"></span>
+                <button id="logout-btn" class="btn btn-sm" title="Logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+            <button id="google-login-btn" class="btn">
+                <i class="fab fa-google"></i> Sign in with Google
+            </button>
             <button id="messages-btn" class="btn icon-only" title="Messages">
                 <i class="fas fa-comment-alt"></i>
             </button>
@@ -494,7 +504,9 @@
     </div>
 
     <!-- SCRIPTS -->
-    <script src="https://apis.google.com/js/api.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <script src="js/firebaseConfig.js"></script>
     <script src="js/kanban.js"></script>
     <script src="js/userManager.js"></script>
     <script src="js/googleSheets.js"></script>

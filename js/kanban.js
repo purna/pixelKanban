@@ -525,7 +525,15 @@ class KanbanBoard {
         const container = document.getElementById('comments-list');
         if (!container) return;
         
+        // Check if users exist
+        const usersExist = window.userManager && window.userManager.users && window.userManager.users.length > 0;
+        
         container.innerHTML = '';
+        
+        if (!usersExist) {
+            container.innerHTML = '<p class="no-comments">Create a user first to add and view comments.</p>';
+            return;
+        }
         
         if (comments.length === 0) {
             container.innerHTML = '<p class="no-comments">No comments yet. Be the first to comment!</p>';
@@ -622,6 +630,31 @@ class KanbanBoard {
     setupCommentListeners() {
         const addBtn = document.getElementById('add-comment-btn');
         const commentText = document.getElementById('new-comment-text');
+        
+        // Check if users exist
+        const usersExist = window.userManager && window.userManager.users && window.userManager.users.length > 0;
+        
+        if (!usersExist) {
+            // Disable comment functionality when no users exist
+            if (addBtn) {
+                addBtn.disabled = true;
+                addBtn.title = 'Create a user first to add comments';
+            }
+            if (commentText) {
+                commentText.disabled = true;
+                commentText.placeholder = 'Create a user first to add comments';
+            }
+            return;
+        }
+        
+        if (addBtn) {
+            addBtn.disabled = false;
+            addBtn.title = '';
+        }
+        if (commentText) {
+            commentText.disabled = false;
+            commentText.placeholder = 'Add a comment...';
+        }
         
         if (addBtn) {
             addBtn.onclick = () => {

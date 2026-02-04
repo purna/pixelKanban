@@ -1,17 +1,141 @@
 /**
- * User Management System
+ * User Management System with Firebase Authentication
  */
 class UserManager {
     constructor() {
         this.users = [];
         this.nextUserId = 1;
         this.currentUserId = null; // Track current logged in user
+        this.firebaseUser = null; // Track Firebase user
         this.init();
     }
 
     init() {
         this.loadUsers();
+        this.setupFirebaseAuth();
         this.setupEventListeners();
+    }
+
+    // Firebase Authentication Setup
+    setupFirebaseAuth() {
+        if (!isFirebaseConfigured()) {
+            console.log('Firebase not configured, skipping auth setup');
+            return;
+        }
+
+        // Listen for auth state changes
+        firebaseAuth.onAuthStateChanged((user) => {
+            this.handleAuthStateChange(user);
+        });
+    }
+
+    // Handle authentication state changes
+    async handleAuthStateChange(user) {
+        this.firebaseUser = user;
+        
+        if (user) {
+            // User is signed in with Firebase
+            console.log('Firebase user signed in:', user.displayName);
+            
+            // Sync Firebase user with local users
+            await this.syncFirebaseUser(user);
+            
+            // Update UI
+            this.updateAuthUI(user);
+            this.showNotification(`Welcome, ${user.displayName}!`, 'success');
+        } else {
+            // User is signed out
+            console.log('Firebase user signed out');
+            this.updateAuthUI(null);
+        }
+    }
+
+    // Sync Firebase user with local user system
+    async syncFirebaseUser(firebaseUser) {
+        // Check if user already exists in local system
+        let localUser = this.getUserByEmail(firebaseUser.email);
+        
+        if (!localUser) {
+            // Create new local user from Firebase data
+            localUser = this.createUser({
+                name: firebaseUser.displayName,
+                email: firebaseUser.email,
+                role: 'developer',
+                firebaseUid: firebaseUser.uid, // Store Firebase UID
+                photoURL: firebaseUser.photoURL || ''
+            });
+            console.log('Created local user from Firebase:', localUser);
+        } else {
+            // Update existing user with Firebase data
+            this.updateUser(localUser.id, {
+                name: firebaseUser.displayName,
+                photoURL: firebaseUser.photoURL || ''
+            });
+        }
+        
+        // Set as current user
+        this.currentUserId = localUser.id;
+        
+        // Save default user
+        localStorage.setItem('kanban-default-user', localUser.id.toString());
+        
+        return localUser;
+    }
+
+    // Sign in with Google
+    async signInWithGoogle() {
+        if (!isFirebaseConfigured()) {
+            alert('Firebase is not configured. Please add your Firebase config to js/firebaseConfig.js');
+            return null;
+        }
+        
+        try {
+            const result = await signInWithGoogle();
+            return result;
+        } catch (error) {
+            console.error('Google sign-in error:', error);
+            this.showNotification('Google sign-in failed: ' + error.message, 'error');
+            return null;
+        }
+    }
+
+    // Sign out
+    async signOut() {
+        if (!isFirebaseConfigured()) return;
+        
+        try {
+            await signOut();
+            this.showNotification('Signed out successfully', 'info');
+        } catch (error) {
+            console.error('Sign out error:', error);
+        }
+    }
+
+    // Update UI based on auth state
+    updateAuthUI(user) {
+        const loginBtn = document.getElementById('google-login-btn');
+        const userDisplay = document.getElementById('user-display');
+        const userNameDisplay = document.getElementById('user-name-display');
+        const userPhoto = document.getElementById('user-photo');
+        
+        if (user) {
+            // User is signed in
+            if (loginBtn) loginBtn.style.display = 'none';
+            if (userDisplay) {
+                userDisplay.style.display = 'flex';
+                userNameDisplay.textContent = user.displayName;
+                if (userPhoto && user.photoURL) {
+                    userPhoto.src = user.photoURL;
+                    userPhoto.style.display = 'block';
+                } else if (userPhoto) {
+                    userPhoto.style.display = 'none';
+                }
+            }
+        } else {
+            // User is signed out
+            if (loginBtn) loginBtn.style.display = 'inline-flex';
+            if (userDisplay) userDisplay.style.display = 'none';
+        }
     }
 
     // User CRUD Operations
@@ -21,6 +145,8 @@ class UserManager {
             name: userData.name,
             email: userData.email || '',
             role: userData.role || 'developer',
+            firebaseUid: userData.firebaseUid || null,
+            photoURL: userData.photoURL || '',
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
         };
@@ -145,6 +271,15 @@ class UserManager {
         // Refresh the assignee dropdown in kanban board
         if (window.kanbanBoard) {
             window.kanbanBoard.populateAssigneeDropdown();
+            // Re-enable comments now that users exist
+            window.kanbanBoard.setupCommentListeners();
+            // Refresh comments list if a task is open
+            if (window.kanbanBoard.currentTaskId) {
+                const task = window.kanbanBoard.tasks.find(t => t.id === window.kanbanBoard.currentTaskId);
+                if (task) {
+                    window.kanbanBoard.renderCommentsList(task.comments || []);
+                }
+            }
         }
         
         // Refresh users list in settings if open
@@ -202,6 +337,18 @@ class UserManager {
         const addUserBtn = document.getElementById('add-user-btn');
         if (addUserBtn) {
             addUserBtn.addEventListener('click', () => this.openUserModal());
+        }
+
+        // Google login button
+        const googleLoginBtn = document.getElementById('google-login-btn');
+        if (googleLoginBtn) {
+            googleLoginBtn.addEventListener('click', () => this.signInWithGoogle());
+        }
+
+        // Logout button
+        const logoutBtn = document.getElementById('logout-btn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', () => this.signOut());
         }
 
         // User modal
