@@ -32,10 +32,12 @@
             <button id="google-login-btn" class="btn">
                 <i class="fab fa-google"></i> Sign in with Google
             </button>
+            <button id="google-sheets-btn" class="btn" title="Google Sheets">
+                <i class="fab fa-google"></i> Sheets
+            </button>
             <button id="messages-btn" class="btn icon-only" title="Messages">
                 <i class="fas fa-comment-alt"></i>
             </button>
-            <button id="import-sheets-btn" class="btn"><i class="fas fa-file-import"></i> Import</button>
             <button id="add-user-btn" class="btn"><i class="fas fa-user-plus"></i> Add User</button>
             <button id="settings-btn" class="btn icon-only" title="Settings"><i class="fas fa-cog"></i></button>
         </div>
@@ -310,54 +312,70 @@
         </div>
     </div>
 
-    <!-- GOOGLE SHEETS IMPORT MODAL -->
-    <div class="modal-overlay" id="sheets-modal">
-        <div class="modal">
+    <!-- GOOGLE SHEETS SAVE/LOAD MODAL -->
+    <div class="modal-overlay" id="google-sheets-modal">
+        <div class="modal" style="max-width: 500px;">
             <header>
                 <div class="modal-title">
-                    <i class="fas fa-file-import"></i> Import from Google Sheets
+                    <i class="fab fa-google"></i> Google Sheets
                 </div>
-                <button class="modal-close" id="sheets-modal-close">&times;</button>
+                <button class="modal-close" id="google-sheets-modal-close">&times;</button>
             </header>
 
             <div class="modal-content">
-                <div class="form-group">
-                    <label for="sheets-url">Google Sheets URL</label>
-                    <input type="url" id="sheets-url" placeholder="https://docs.google.com/spreadsheets/d/...">
-                </div>
-
-                <div class="form-group">
-                    <label for="sheets-range">Sheet Range (optional)</label>
-                    <input type="text" id="sheets-range" placeholder="Sheet1!A1:D100">
-                </div>
-
-                <div class="form-group">
-                    <label>Column Mapping</label>
-                    <div class="column-mapping">
-                        <div class="mapping-row">
-                            <label>Title Column:</label>
-                            <input type="text" id="title-column" placeholder="A" value="A">
+                <!-- Google Sign In Status -->
+                <div id="google-sheets-auth" class="google-sheets-auth">
+                    <div id="google-signin-status" class="google-signin-status">
+                        <p id="google-auth-message">Sign in with Google to save and load boards</p>
+                        <div id="g_id_onload"
+                            data-client_id="YOUR_CLIENT_ID.apps.googleusercontent.com"
+                            data-context="signin"
+                            data-ux_mode="popup"
+                            data-callback="handleGoogleSignIn"
+                            data-auto_prompt="false">
                         </div>
-                        <div class="mapping-row">
-                            <label>Description Column:</label>
-                            <input type="text" id="description-column" placeholder="B" value="B">
-                        </div>
-                        <div class="mapping-row">
-                            <label>Assignee Column:</label>
-                            <input type="text" id="assignee-column" placeholder="C" value="C">
-                        </div>
-                        <div class="mapping-row">
-                            <label>Status Column:</label>
-                            <input type="text" id="status-column" placeholder="D" value="D">
+                        <div class="g_id_signin"
+                            data-type="standard"
+                            data-size="large"
+                            data-theme="outline"
+                            data-text="signin_with"
+                            data-shape="rectangular"
+                            data-logo_alignment="left">
                         </div>
                     </div>
+                </div>
+
+                <!-- Signed In View -->
+                <div id="google-sheets-signedin" style="display: none;">
+                    <div class="form-group">
+                        <label>Spreadsheet URL</label>
+                        <input type="url" id="gs-spreadsheet-url" placeholder="https://docs.google.com/spreadsheets/d/...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Sheet Name</label>
+                        <input type="text" id="gs-sheet-name" placeholder="Kanban" value="Kanban">
+                    </div>
+
+                    <div class="google-sheets-actions">
+                        <button class="btn primary" id="gs-save-btn">
+                            <i class="fas fa-save"></i> Save to Sheet
+                        </button>
+                        <button class="btn" id="gs-load-btn">
+                            <i class="fas fa-download"></i> Load from Sheet
+                        </button>
+                        <button class="btn" id="gs-create-btn">
+                            <i class="fas fa-plus"></i> Create New
+                        </button>
+                    </div>
+
+                    <div id="gs-status" class="gs-status"></div>
                 </div>
             </div>
 
             <footer>
                 <div class="modal-actions">
-                    <button class="btn" id="sheets-cancel-btn">Cancel</button>
-                    <button class="btn primary" id="sheets-import-btn">Import Tasks</button>
+                    <button class="btn" id="google-sheets-close-btn">Close</button>
                 </div>
             </footer>
         </div>
@@ -578,6 +596,9 @@
     <!-- SCRIPTS -->
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+    <!-- Google Identity Services -->
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://apis.google.com/js/api.js" async defer></script>
     <script src="js/firebaseConfig.js"></script>
     <script src="js/kanban.js"></script>
     <script src="js/userManager.js"></script>
@@ -586,6 +607,7 @@
     <script src="js/boardManager.js"></script>
     <script src="js/notifications.js"></script>
     <script src="js/settingsManager.js"></script>
+    <script src="js/databaseManager.js"></script>
 
     <footer class="app-footer">
         <p>Pixelagent 2026. All rights reserved.</p>

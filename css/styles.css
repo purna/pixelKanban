@@ -1699,3 +1699,160 @@ header {
     font-weight: 500;
     letter-spacing: 0.5px;
 }
+
+/* Google Sheets Integration Styles */
+.google-sheets-auth {
+    text-align: center;
+    padding: 20px;
+}
+
+.google-signin-status {
+    margin-bottom: 20px;
+}
+
+.google-signin-status p {
+    margin-bottom: 16px;
+    color: var(--text-secondary);
+}
+
+.google-sheets-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 20px;
+}
+
+.google-sheets-actions .btn {
+    justify-content: center;
+}
+
+.gs-status {
+    margin-top: 16px;
+    padding: 12px;
+    border-radius: var(--border-radius);
+    display: none;
+}
+
+.gs-status-info {
+    background: rgba(0, 217, 255, 0.1);
+    border: 1px solid var(--accent-tertiary);
+    color: var(--accent-tertiary);
+}
+
+.gs-status-success {
+    background: rgba(0, 255, 65, 0.1);
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.gs-status-error {
+    background: rgba(255, 0, 110, 0.1);
+    border: 1px solid var(--accent-secondary);
+    color: var(--accent-secondary);
+}
+
+/* Database Manager Styles */
+.database-status-section {
+    margin-bottom: 20px;
+}
+
+.database-status {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+}
+
+.database-status i {
+    color: var(--accent-primary);
+}
+
+.database-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.database-actions .btn {
+    justify-content: center;
+}
+
+.db-boards-list {
+    background: var(--bg-light);
+    border: 1px solid var(--border-color);
+    border-radius: var(--border-radius);
+    padding: 12px;
+}
+
+.db-boards-list h4 {
+    color: var(--text-primary);
+    margin-bottom: 12px;
+    font-size: 0.9rem;
+}
+
+.db-board-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    background: var(--bg-medium);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    margin-bottom: 8px;
+}
+
+.db-board-item:last-child {
+    margin-bottom: 0;
+}
+
+.db-board-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.db-board-name {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.db-board-meta {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.db-board-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.db-board-actions .btn {
+    padding: 4px 8px;
+    font-size: 0.75rem;
+}
+
+.db-status-message {
+    margin-top: 12px;
+    padding: 10px;
+    border-radius: var(--border-radius);
+    font-size: 0.85rem;
+    display: none;
+}
+
+.db-status-message.success {
+    display: block;
+    background: rgba(0, 255, 65, 0.1);
+    border: 1px solid var(--accent-primary);
+    color: var(--accent-primary);
+}
+
+.db-status-message.error {
+    display: block;
+    background: rgba(255, 0, 110, 0.1);
+    border: 1px solid var(--accent-secondary);
+    color: var(--accent-secondary);
+}
