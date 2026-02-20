@@ -16,11 +16,20 @@ class GitHubAPI {
     constructor() {
         this.BASE_URL = 'https://api.github.com';
         this.GRAPHQL_URL = 'https://api.github.com/graphql';
-        this.accessToken = localStorage.getItem('github_access_token');
-        this.tokenType = localStorage.getItem('github_token_type') || 'pat'; // 'oauth' or 'pat'
+        // Read token from config or localStorage
+        this.accessToken = localStorage.getItem('github_access_token') || githubConfig.accessToken || '';
+        this.tokenType = localStorage.getItem('github_token_type') || githubConfig.tokenType || 'pat';
         this.user = null;
-        this.selectedRepo = localStorage.getItem('github_selected_repo');
-        this.selectedProject = localStorage.getItem('github_selected_project');
+        // Read saved repo from localStorage or config
+        const savedRepo = localStorage.getItem('github_selected_repo');
+        this.selectedRepo = savedRepo ? JSON.parse(savedRepo) : null;
+        if (!this.selectedRepo && githubConfig.defaultOwner && githubConfig.defaultRepo) {
+            this.selectedRepo = {
+                owner: { login: githubConfig.defaultOwner },
+                name: githubConfig.defaultRepo,
+                fullName: `${githubConfig.defaultOwner}/${githubConfig.defaultRepo}`
+            };
+        }
     }
 
     /**
@@ -304,6 +313,14 @@ class GitHubAPI {
     }
 
     /**
+     * Get repository collaborators
+     */
+    async getRepoCollaborators(owner, repo) {
+        const collaborators = await this.request(`/repos/${owner}/${repo}/collaborators?per_page=100`);
+        return collaborators;
+    }
+
+    /**
      * Search issues
      */
     async searchIssues(query) {
@@ -321,8 +338,13 @@ class GitHubBoards {
         this.syncStatus = 'idle'; // 'idle', 'syncing', 'success', 'error'
         this.lastSync = localStorage.getItem('github_last_sync');
         
-        // Column mapping between pixelKanban and GitHub
-        this.columnMapping = {
+        // Column mapping - read from config or use defaults
+        this.columnMapping = githubConfig.labels ? {
+            'backlog': { status: 'backlog', label: githubConfig.labels.backlog || 'backlog' },
+            'todo': { status: 'todo', label: githubConfig.labels.todo || 'to do' },
+            'in-progress': { status: 'in_progress', label: githubConfig.labels.inProgress || 'in progress' },
+            'done': { status: 'closed', label: githubConfig.labels.done || 'done' }
+        } : {
             'backlog': { status: 'backlog', label: 'backlog' },
             'todo': { status: 'todo', label: 'to do' },
             'in-progress': { status: 'in_progress', label: 'in progress' },
@@ -450,7 +472,7 @@ class GitHubBoards {
             const statusLabels = ['backlog', 'to do', 'in progress', 'done'];
             for (const status of statusLabels) {
                 if (!labelMap[status]) {
-                    const colors = {
+                    const colors = githubConfig.labelColors || {
                         'backlog': '6e7681',
                         'to do': '0e7a86',
                         'in progress': 'a371f7',
@@ -694,6 +716,47 @@ class GitHubBoards {
     }
 
     /**
+     * Import collaborators as users
+     */
+    async importCollaboratorsAsUsers() {
+        if (!this.isConnected()) {
+            throw new Error('Not connected to GitHub');
+        }
+
+        const repo = this.api.selectedRepo;
+        if (!repo) {
+            throw new Error('No repository selected');
+        }
+
+        try {
+            const collaborators = await this.api.getRepoCollaborators(repo.owner.login, repo.name);
+            let importedCount = 0;
+
+            for (const collab of collaborators) {
+                // Check if user already exists
+                const existingUser = window.userManager?.getUserByEmail(collab.email);
+                if (existingUser) continue;
+
+                // Create user from collaborator
+                window.userManager?.createUser({
+                    name: collab.login,
+                    email: collab.email || `${collab.login}@users.noreply.github.com`,
+                    role: 'developer',
+                    githubUsername: collab.login,
+                    photoURL: collab.avatar_url
+                });
+                importedCount++;
+            }
+
+            this.showNotification(`Imported ${importedCount} collaborators as users`, 'success');
+            return { success: true, count: importedCount };
+        } catch (error) {
+            this.showNotification('Failed to import collaborators: ' + error.message, 'error');
+            throw error;
+        }
+    }
+
+    /**
      * Show notification
      */
     showNotification(message, type = 'info') {
@@ -814,6 +877,16 @@ class GitHubBoardsUI {
                                     <button id="github-sync-btn" class="btn" style="width: 100%;" disabled>
                                         <i class="fas fa-sync"></i> Sync Both Ways
                                     </button>
+                                </div>
+                                
+                                <!-- Import Collaborators -->
+                                <div style="margin-top: 16px;">
+                                    <button id="github-import-users-btn" class="btn" style="width: 100%;" disabled>
+                                        <i class="fas fa-users"></i> Import Collaborators as Users
+                                    </button>
+                                    <div id="github-collaborators-list" style="margin-top: 12px; max-height: 150px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 4px; padding: 8px;">
+                                        <p style="color: var(--text-secondary); font-size: 0.9em;">Select a repository to see collaborators</p>
+                                    </div>
                                 </div>
                                 
                                 <hr style="margin: 16px 0; border: none; border-top: 1px solid var(--border-color);">
@@ -940,6 +1013,19 @@ class GitHubBoardsUI {
                 }
             }
         });
+        
+        // Import collaborators button
+        document.getElementById('github-import-users-btn')?.addEventListener('click', async () => {
+            try {
+                await this.githubBoards.importCollaboratorsAsUsers();
+                // Refresh the user dropdown in kanban board
+                if (window.kanbanBoard) {
+                    window.kanbanBoard.populateAssigneeDropdown();
+                }
+            } catch (error) {
+                this.showStatus('Import failed: ' + error.message, 'error');
+            }
+        });
     }
 
     openModal() {
@@ -951,11 +1037,33 @@ class GitHubBoardsUI {
         document.getElementById('github-modal')?.classList.remove('active');
     }
 
+    async autoConnect() {
+        // Auto-connect using config token
+        if (!isGitHubConfigured()) return;
+        
+        try {
+            await this.githubBoards.authenticate(
+                githubConfig.accessToken, 
+                githubConfig.tokenType || 'pat'
+            );
+            this.updateUI();
+            this.loadRepositories();
+        } catch (error) {
+            console.warn('Auto-connect failed:', error.message);
+        }
+    }
+
     updateUI() {
         const status = this.githubBoards.getStatus();
         const loginForm = document.getElementById('github-login-form');
         const connectedView = document.getElementById('github-connected-view');
         const connectionStatus = document.getElementById('github-connection-status');
+        
+        // Auto-connect if token is configured
+        if (!status.connected && isGitHubConfigured() && githubConfig.accessToken) {
+            this.autoConnect();
+            return;
+        }
         
         if (status.connected) {
             loginForm.style.display = 'none';
@@ -1019,12 +1127,15 @@ class GitHubBoardsUI {
         document.getElementById('github-push-btn').disabled = false;
         document.getElementById('github-pull-btn').disabled = false;
         document.getElementById('github-sync-btn').disabled = false;
+        document.getElementById('github-import-users-btn').disabled = false;
+        this.loadCollaborators();
     }
 
     disableSyncButtons() {
         document.getElementById('github-push-btn').disabled = true;
         document.getElementById('github-pull-btn').disabled = true;
         document.getElementById('github-sync-btn').disabled = true;
+        document.getElementById('github-import-users-btn').disabled = true;
     }
 
     updateSyncStatus() {
@@ -1038,6 +1149,35 @@ class GitHubBoardsUI {
             } else {
                 lastSyncEl.textContent = 'Last sync: Never';
             }
+        }
+    }
+
+    async loadCollaborators() {
+        const collaboratorsEl = document.getElementById('github-collaborators-list');
+        if (!collaboratorsEl) return;
+        
+        const repo = this.githubBoards.getSelectedRepo();
+        if (!repo) {
+            collaboratorsEl.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9em;">Select a repository to see collaborators</p>';
+            return;
+        }
+        
+        try {
+            const collaborators = await this.githubBoards.api.getRepoCollaborators(repo.owner.login, repo.name);
+            
+            if (collaborators.length === 0) {
+                collaboratorsEl.innerHTML = '<p style="color: var(--text-secondary); font-size: 0.9em;">No collaborators found</p>';
+                return;
+            }
+            
+            collaboratorsEl.innerHTML = collaborators.map(collab => `
+                <div style="display: flex; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid var(--border-color);">
+                    <img src="${collab.avatar_url}" style="width: 24px; height: 24px; border-radius: 50%;">
+                    <span style="font-size: 0.9em;">${collab.login}</span>
+                </div>
+            `).join('');
+        } catch (error) {
+            collaboratorsEl.innerHTML = '<p style="color: var(--error-color); font-size: 0.9em;">Failed to load collaborators</p>';
         }
     }
 
