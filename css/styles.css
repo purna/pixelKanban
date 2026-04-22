@@ -18,6 +18,7 @@
     
     /* LAYOUT DIMENSIONS */
     --header-height: 50px;
+    --footer-height: 56px;
     --border-glow: rgba(0, 255, 65, 0.3);
     
     /* TASK COLORS */
@@ -266,7 +267,7 @@ header {
     padding: 2rem;
     max-width: 1400px;
     margin: 0 auto;
-    height: calc(100vh - var(--header-height));
+    height: calc(100vh - var(--header-height) - var(--footer-height));
     overflow: hidden;
 }
 
@@ -293,9 +294,9 @@ header {
     box-shadow: var(--shadow);
     overflow: hidden;
     border: 1px solid var(--border-color);
-    display: flex;
-    flex-direction: column;
-    max-height: 100%;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    max-height: 90%;
 }
 
 .column-header {
@@ -327,10 +328,8 @@ header {
 
 .column-content {
     padding: 12px;
-    min-height: 200px;
-    max-height: calc(100% - 60px);
+    min-height: 0;
     overflow-y: auto;
-    flex: 1;
 }
 
 .column-content::-webkit-scrollbar {
