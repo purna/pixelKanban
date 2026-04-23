@@ -29,12 +29,6 @@
                     <i class="fas fa-sign-out-alt"></i>
                 </button>
             </div>
-            <button id="google-login-btn" class="btn">
-                <i class="fab fa-google"></i> Sign in with Google
-            </button>
-            <button id="google-sheets-btn" class="btn" title="Google Sheets">
-                <i class="fab fa-google"></i> Sheets
-            </button>
             <button id="github-btn" class="btn" title="GitHub Boards">
                 <i class="fab fa-github"></i> GitHub
             </button>
@@ -419,16 +413,25 @@
                     <button class="settings-tab" data-tab="comments">Comments</button>
                 </div>
 
-                <!-- Boards Tab -->
-                <div class="settings-tab-content" id="tab-boards">
-                    <h4>Board Management</h4>
-                    <div class="board-actions">
-                        <button class="btn" id="save-board-btn"><i class="fas fa-save"></i> Save</button>
-                        <button class="btn" id="auto-save-btn"><i class="fas fa-save"></i> Auto-Save</button>
-                        <button class="btn" id="export-json-btn"><i class="fas fa-file-export"></i> Export JSON</button>
-                        <button class="btn" id="import-json-btn"><i class="fas fa-file-import"></i> Import JSON</button>
-                        <input type="file" id="import-json-input" accept=".json" style="display:none">
-                    </div>
+                 <!-- Boards Tab -->
+                 <div class="settings-tab-content" id="tab-boards">
+                     <h4>Board Management</h4>
+                     <div class="board-actions">
+                         <button class="btn" id="save-board-btn"><i class="fas fa-save"></i> Save</button>
+                         <button class="btn" id="auto-save-btn"><i class="fas fa-save"></i> Auto-Save</button>
+                         <button class="btn" id="export-json-btn"><i class="fas fa-file-export"></i> Export JSON</button>
+                         <button class="btn" id="import-json-btn"><i class="fas fa-file-import"></i> Import JSON</button>
+                         <input type="file" id="import-json-input" accept=".json" style="display:none">
+                     </div>
+                     
+                     <div class="database-actions" style="margin-top: 16px;">
+                         <button id="google-sheets-btn" class="btn" title="Google Sheets Backup">
+                             <i class="fab fa-google"></i> Sheets
+                         </button>
+                         <button id="google-login-btn" class="btn" title="Sign in with Google">
+                             <i class="fab fa-google"></i> Sign in with Google
+                         </button>
+                     </div>
                     <h4 style="margin-top: 20px;">Saved Boards</h4>
                     <div id="saved-boards-list" class="saved-boards-list">
                         <!-- Dynamically populated -->

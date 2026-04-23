@@ -15,6 +15,8 @@ class GoogleSheetsManager {
         this.loadCredentials();
         this.setupEventListeners();
         this.checkAuthStatus();
+        // Listen for custom events from settings manager
+        window.addEventListener('open-google-sheets', () => this.openModal());
     }
 
     loadCredentials() {

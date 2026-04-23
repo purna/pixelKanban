@@ -16,6 +16,8 @@ class UserManager {
         this.loadUsers();
         this.setupFirebaseAuth();
         this.setupEventListeners();
+        // Listen for custom events from settings manager
+        window.addEventListener('trigger-google-signin', () => this.signInWithGoogle());
     }
 
     // ========== ROLES MANAGEMENT ==========

@@ -1349,12 +1349,12 @@ class GitHubBoardsUI {
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    const initGitHub = () => {
-        if (window.notifications) {
-            window.githubBoardsUI = new GitHubBoardsUI({
-                kanbanBoard: window.kanbanBoard,
-                notifications: window.notifications
-            });
+        const initGitHub = () => {
+            if (window.Notifications) {
+                window.githubBoardsUI = new GitHubBoardsUI({
+                    kanbanBoard: window.kanbanBoard,
+                    notifications: window.Notifications
+                });
             
             // Add event listener for GitHub button in header
             const githubBtn = document.getElementById('github-btn');
