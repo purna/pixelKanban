@@ -136,35 +136,56 @@ pixelKanban/
 
 ## Deployment
 
-### GitHub Pages via Actions
+Deploy your pixelKanban site to GitHub Pages using either the automated workflow or the deployment script.
 
-Two workflow options are available:
+### GitHub Pages via Actions (Recommended)
 
-**Manual Deployment** — Go to *Actions* → *Deploy to GitHub Pages* → *Run workflow*
-- Choose target branch (default: `gh-pages`)
-- Optionally provide custom commit message
+**Manual Deployment:**
+1. Go to *Actions* tab → *Deploy to GitHub Pages* → *Run workflow*
+2. Choose target branch (default: `gh-pages`)
+3. Optionally provide custom commit message
+4. After workflow completes, enable GitHub Pages:
+   - Repository *Settings* → *Pages*
+   - Source: select the deployed branch (e.g., `gh-pages`) / `root`
+   - Save
+5. Your site will be available at: `https://<username>.github.io/<repo-name>/`
 
-**Auto-Deploy** — Automatic on every push to `main`/`master`
-- Deploys to `gh-pages` branch automatically
-- Configured in `.github/workflows/auto-deploy.yml`
+**Auto-Deploy:**
+- Automatic deployment on every push to `main`/`master`
+- Configured in `.github/workflows/deploy-kanban.yml`
+- Deploys to `gh-pages` branch wired to your repository's GitHub Issues
 
-After first deployment, enable GitHub Pages:
-1. Repository *Settings* → *Pages*
-2. Source: select the deployed branch (e.g., `gh-pages`) / `root`
-3. Save
+**Workflow Examples:**
+```yaml
+# Manual trigger with custom branch and message
+workflow_dispatch:
+  inputs:
+    branch:
+      description: 'Deploy to branch'
+      default: 'gh-pages'
+    message:
+      description: 'Commit message'
+      default: 'Deploy pixelKanban'
+```
 
-Site URL: `https://<username>.github.io/<repo-name>/`
-
-### Local Script
+### Local Script Deployment
 
 Use the included `deploy.sh` script for local deployments:
 ```bash
 ./deploy.sh                    # Deploy to gh-pages (with push)
-./deploy.sh pages              # Deploy to 'pages' branch
+./deploy.sh pages              # Deploy to 'pages' branch  
 ./deploy.sh gh-pages --no-push # Build without pushing
 ```
 
 The script handles stashing changes, branch switching, file cleanup, and push.
+
+### Site Repository Deployment
+
+To deploy to a dedicated site repository (e.g., `username.github.io`):
+1. Create a new repository named `<username>.github.io`
+2. Push the built site files to the `main` branch
+3. Enable GitHub Pages in repository settings with `main` branch as source
+4. Your site will be available at: `https://<username>.github.io/`
 
 ## Technologies Used
 

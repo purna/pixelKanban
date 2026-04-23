@@ -474,6 +474,8 @@ class GitHubBoards {
     selectRepo(repo) {
         this.api.selectedRepo = repo;
         localStorage.setItem('github_selected_repo', JSON.stringify(repo));
+        // Notify other components
+        window.dispatchEvent(new CustomEvent('github-repo-selected', { detail: { repo } }));
     }
 
     /**
