@@ -64,11 +64,57 @@ class KanbanBoard {
     }
 
     init() {
+        // Migrate any corrupted milestone data
+        this.migrateTaskData();
         this.loadTasks();
         this.renderBoard();
         this.setupEventListeners();
         this.setupEmailModalListeners();
         this.setupMessagesSidebarListeners();
+    }
+
+    // Migrate task data to fix any corruption
+    migrateTaskData() {
+        try {
+            const saved = localStorage.getItem('kanban-tasks');
+            if (!saved) return;
+            const tasks = JSON.parse(saved);
+            let changed = false;
+            tasks.forEach(task => {
+                // Fix corrupted milestone data
+                if (task.milestone && typeof task.milestone === 'object') {
+                    // Check if it's a valid milestone object
+                    if (!task.milestone.name && !task.milestone.title) {
+                        // Try to extract from string representation
+                        const str = String(task.milestone);
+                        if (str.includes('[object Object]')) {
+                            task.milestone = null;
+                            changed = true;
+                        }
+                    }
+                }
+            });
+            if (changed) {
+                localStorage.setItem('kanban-tasks', JSON.stringify(tasks));
+                console.log('Migrated task data: fixed corrupted milestone');
+            }
+        } catch (e) {
+            console.warn('Failed to migrate task data:', e);
+        }
+    }
+
+    // Safely get milestone display name
+    getMilestoneDisplayName(milestone) {
+        if (!milestone) return '';
+        if (typeof milestone === 'string') {
+            // If it's "[object Object]", return empty string
+            if (milestone === '[object Object]') return '';
+            return milestone;
+        }
+        if (typeof milestone === 'object') {
+            return milestone.name || milestone.title || '';
+        }
+        return String(milestone);
     }
 
     // Task Management
@@ -200,8 +246,9 @@ class KanbanBoard {
 
         // Determine milestone class for styling
         let milestoneClass = 'task-milestone-badge';
-        if (task.milestone && task.milestone.name) {
-            const msName = task.milestone.name.toLowerCase().replace(/\s+/g, '-');
+        const milestoneName = this.getMilestoneDisplayName(task.milestone);
+        if (milestoneName) {
+            const msName = milestoneName.toLowerCase().replace(/\s+/g, '-');
             milestoneClass += ` milestone-${msName}`;
         }
 
@@ -522,35 +569,6 @@ class KanbanBoard {
             return user ? user.email || '' : '';
         }
         return '';
-    }
-
-    // Generate a consistent color for a label based on its name
-    // First checks local label settings (kanban-labels in localStorage)
-    getLabelColor(labelName) {
-        // First check local label settings
-        try {
-            const stored = localStorage.getItem('kanban-labels');
-            if (stored) {
-                const labels = JSON.parse(stored);
-                const label = labels.find(l => l.name === labelName);
-                if (label && label.color) {
-                    // Return color without # if present
-                    return label.color.replace('#', '');
-                }
-            }
-        } catch (e) {
-            // Ignore parse errors
-        }
-
-        // Fallback: generate consistent color from name
-        let hash = 0;
-        for (let i = 0; i < labelName.length; i++) {
-            hash = labelName.charCodeAt(i) + ((hash << 5) - hash);
-        }
-        const h = Math.abs(hash % 360);
-        const s = 60 + (Math.abs(hash) % 20);
-        const l = 40 + (Math.abs(hash) % 20);
-        return this.hslToHex(h, s, l);
     }
 
     // Convert HSL to hex
@@ -1579,11 +1597,26 @@ class KanbanBoard {
             }
 
             milestones.forEach(ms => {
+                // Defensive: ensure ms is an object with expected properties
+                if (typeof ms !== 'object' || ms === null) {
+                    console.warn('Invalid milestone data:', ms);
+                    return; // skip this entry
+                }
+                
+                const title = ms.title || ms.name || String(ms);
+                const number = ms.number || ms.id || 0;
+                
+                // Skip if title is still an object (shouldn't happen after String() above)
+                if (typeof title === 'object') {
+                    console.warn('Milestone title is still an object:', ms);
+                    return;
+                }
+                
                 const option = document.createElement('option');
-                option.value = ms.number;           // store numeric ID as value
-                option.textContent = ms.title;
-                option.dataset.title  = ms.title;
-                option.dataset.number = ms.number;
+                option.value = number;           // store numeric ID as value
+                option.textContent = title;
+                option.dataset.title  = title;
+                option.dataset.number = number;
                 select.appendChild(option);
             });
 
