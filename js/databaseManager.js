@@ -30,8 +30,18 @@ class DatabaseManager {
         const boardToSave = boardName || (this.boardManager?.currentBoardName || 'default');
         const repo = this.getSelectedRepo();
         
+        // Validate GitHub connection - check both UI connection and actual token
         if (!window.githubBoardsUI?.isConnected()) {
             this.showNotification('Connect to GitHub first (click GitHub button)', 'error');
+            return false;
+        }
+        
+        // Verify token is valid by attempting an API call
+        try {
+            await window.githubBoardsUI.api.getCurrentUser();
+        } catch (error) {
+            this.showNotification('GitHub authentication invalid. Please reconnect.', 'error');
+            window.githubBoards?.disconnect();
             return false;
         }
         
@@ -44,12 +54,31 @@ class DatabaseManager {
             const tasks = this.kanbanBoard?.tasks || [];
             this.showNotification(`Saving ${tasks.length} tasks...`, 'info');
             
+            let savedCount = 0;
+            let errorCount = 0;
+            
             for (const task of tasks) {
-                await this.saveTaskAsIssue(task, repo);
+                try {
+                    await this.saveTaskAsIssue(task, repo);
+                    savedCount++;
+                } catch (taskError) {
+                    console.error(`Failed to save task "${task.title}":`, taskError);
+                    errorCount++;
+                }
             }
             
-            this.showNotification(`Saved ${tasks.length} tasks to ${repo.fullName}`, 'success');
-            return true;
+            if (errorCount > 0) {
+                this.showNotification(`Saved ${savedCount} tasks with ${errorCount} errors`, 'warning');
+            } else {
+                this.showNotification(`Saved ${savedCount} tasks to ${repo.fullName}`, 'success');
+            }
+            
+            // Save local board state after successful sync
+            if (this.boardManager) {
+                this.boardManager.saveCurrentBoard();
+            }
+            
+            return savedCount > 0;
         } catch (error) {
             console.error('Error saving board:', error);
             this.showNotification('Error: ' + error.message, 'error');
@@ -59,13 +88,15 @@ class DatabaseManager {
 
     async saveTaskAsIssue(task, repo) {
         const { api } = window.githubBoardsUI;
-        if (!api?.isAuthenticated()) return;
+        if (!api?.isAuthenticated()) {
+            throw new Error('GitHub API not authenticated. Please reconnect.');
+        }
 
-        // Build metadata
+        // Build metadata for kanban column mapping
         const metadata = `<!-- kanban-metadata \ncolumn: ${task.columnId}\ntaskId: ${task.id}\n-->`;
         const body = `${task.description || ''}\n\n${metadata}`.trim();
 
-        // Build labels
+        // Build labels - include column label plus any task-specific labels
         const labels = [this.getColumnLabel(task.columnId)];
         if (task.labels && Array.isArray(task.labels)) {
             labels.push(...task.labels);
@@ -77,7 +108,7 @@ class DatabaseManager {
             labels: [...new Set(labels)]
         };
 
-        // Create or update
+        // Update existing issue or create new one
         if (task.githubIssueId) {
             try {
                 await api.request(`/repos/${repo.owner.login}/${repo.name}/issues/${task.githubIssueId}`, {
@@ -86,6 +117,8 @@ class DatabaseManager {
                 });
                 return;
             } catch (e) {
+                // Issue might have been deleted, fall through to create
+                console.warn(`Failed to update issue #${task.githubIssueId}, creating new:`, e.message);
                 task.githubIssueId = null;
             }
         }
@@ -196,26 +229,12 @@ class DatabaseUI {
     constructor(app) {
         this.app = app;
         this.databaseManager = new DatabaseManager(app);
-        this.githubBoards = null;
         this.init();
     }
 
     init() {
         this.addDatabaseButtonToHeader();
         this.addDatabaseModalToPage();
-        this.waitForGitHubBoards();
-    }
-
-    waitForGitHubBoards() {
-        // Poll until githubBoardsUI is ready
-        const check = () => {
-            if (window.githubBoardsUI) {
-                this.githubBoards = window.githubBoardsUI;
-            } else {
-                setTimeout(check, 100);
-            }
-        };
-        check();
     }
 
     addDatabaseButtonToHeader() {
@@ -272,6 +291,14 @@ class DatabaseUI {
         this.setupEventListeners();
     }
 
+    /**
+     * Get the GitHubBoardsUI instance from global scope
+     * Ensures we always use the current instance
+     */
+    getGitHubUI() {
+        return window.githubBoardsUI;
+    }
+
     setupEventListeners() {
         document.getElementById('database-modal-close')?.addEventListener('click', () => this.closeModal());
         document.getElementById('db-close-btn')?.addEventListener('click', () => this.closeModal());
@@ -280,34 +307,37 @@ class DatabaseUI {
         });
 
         document.getElementById('db-save-btn')?.addEventListener('click', async () => {
-            if (!this.githubBoards?.isConnected()) {
+            const githubUI = this.getGitHubUI();
+            if (!githubUI?.isConnected()) {
                 this.showStatus('Connect GitHub first', 'error');
-                this.githubBoards?.openModal();
+                githubUI?.openModal();
                 return;
             }
             await this.databaseManager.saveBoardToDatabase();
         });
 
         document.getElementById('db-load-btn')?.addEventListener('click', async () => {
-            if (!this.githubBoards?.isConnected()) {
+            const githubUI = this.getGitHubUI();
+            if (!githubUI?.isConnected()) {
                 this.showStatus('Connect GitHub first', 'error');
-                this.githubBoards?.openModal();
+                githubUI?.openModal();
                 return;
             }
             await this.databaseManager.loadBoardFromDatabase();
         });
 
         document.getElementById('db-github-btn')?.addEventListener('click', () => {
-            this.githubBoards?.openModal();
+            this.getGitHubUI()?.openModal();
         });
 
-        // Update status when repo changes
+        // Update status when repo changes or connection changes
         window.addEventListener('github-repo-selected', () => {
             if (document.getElementById('database-modal')?.classList.contains('active')) {
                 this.updateStatus();
             }
         });
 
+        // Also listen for generic auth change (if we add that event later)
         this.updateStatus();
     }
 
@@ -332,10 +362,13 @@ class DatabaseUI {
         const el = document.getElementById('db-status');
         if (!el) return;
         
-        if (this.githubBoards?.isConnected()) {
-            const repo = this.githubBoards.getSelectedRepo();
-            const user = this.githubBoards.api?.user;
-            el.innerHTML = `<i class="fas fa-check-circle"></i> Connected as <strong>@${user?.login}</strong> to <code>${repo?.fullName || repo?.name}</code>`;
+        const githubUI = this.getGitHubUI();
+        
+        if (githubUI?.isConnected()) {
+            const repo = githubUI.getSelectedRepo();
+            const user = githubUI.api?.user;
+            const repoName = repo?.fullName || repo?.name || 'not selected';
+            el.innerHTML = `<i class="fas fa-check-circle"></i> Connected as <strong>@${user?.login || 'unknown'}</strong> to <code>${repoName}</code>`;
         } else {
             el.innerHTML = `<i class="fas fa-unlink"></i> Not connected to GitHub`;
         }
