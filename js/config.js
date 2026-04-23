@@ -103,6 +103,20 @@ const githubConfig = {
     },
     
     /**
+     * Milestone colors (hex without #)
+     * These colors will be used when creating milestones
+     */
+    milestoneColors: {
+        backlog: '6e7681',    // Gray
+        todo: '0e7a86',       // Teal
+        inProgress: 'a371f7', // Purple
+        done: '3fb950',      // Green
+        'sprint-1': 'f7d358', // Yellow
+        'sprint-2': 'ff6b6b', // Red
+        release: '4ecdc4'    // Cyan
+    },
+    
+    /**
      * Repository name for storing board data
      * When using GitHub as a database, boards are saved as JSON files
      */
@@ -304,41 +318,51 @@ const appConfig = {
          * Enable GitHub integration
          */
         githubIntegration: true,
-        
+
         /**
          * Enable Google Sheets integration
          */
         googleSheetsIntegration: true,
-        
+
         /**
          * Enable Firebase authentication
          */
         firebaseAuth: false,
-        
+
         /**
          * Enable drag and drop
          */
         dragAndDrop: true,
-        
+
         /**
          * Enable comments
          */
         comments: true,
-        
+
         /**
          * Enable attachments
          */
         attachments: true,
-        
+
         /**
          * Enable user management
          */
         userManagement: true,
-        
+
         /**
          * Enable notifications
          */
-        notifications: true
+        notifications: true,
+
+        /**
+         * Enable milestones integration
+         */
+        milestones: true,
+
+        /**
+         * Enable GitHub labels integration
+         */
+        labels: true
     },
     
     /**

@@ -1,0 +1,82 @@
+# Deployment workflow for pixelKanban GitHub Pages
+# Trigger manually from Actions tab or via repository_dispatch
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: 'Branch to deploy to (default: gh-pages)'
+        required: false
+        default: 'gh-pages'
+      commit_message:
+        description: 'Commit message for deployment'
+        required: false
+        default: 'Deploy pixelKanban to GitHub Pages'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout current branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup git config
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine target branch
+        id: vars
+        run: |
+          echo "target_branch=${{ inputs.target_branch || 'gh-pages' }}" >> $GITHUB_OUTPUT
+
+      - name: Switch to target branch (create if needed)
+        run: |
+          if git show-ref --verify --quiet "refs/heads/${{ steps.vars.outputs.target_branch }}"; then
+            git checkout ${{ steps.vars.outputs.target_branch }}
+          else
+            git checkout -b ${{ steps.vars.outputs.target_branch }}
+          fi
+
+      - name: Clean working tree
+        run: |
+          # Remove all tracked files except .git
+          git rm -rf . 2>/dev/null || true
+          git clean -fdx
+
+      - name: Copy site files from source branch
+        run: |
+          git checkout ${{ github.ref_name }} -- .
+
+      - name: Remove deployment artifacts
+        run: |
+          rm -rf .github deploy.sh README.md .gitignore
+          # Keep only static site files
+
+      - name: Create .nojekyll (disable Jekyll processing)
+        run: touch .nojekyll
+
+      - name: Commit and push deployment
+        run: |
+          git add -A
+          git commit -m "${{ inputs.commit_message }}" --allow-empty
+          git push origin ${{ steps.vars.outputs.target_branch }}
+
+      - name: Output site URL
+        run: |
+          REPO_NAME=$(basename "${{ github.repository }}")
+          echo "📦 Site deployed successfully!"
+          echo "🌐 URL: https://${{ github.repository_owner }}.github.io/$REPO_NAME/"
+          echo ""
+          echo "To activate GitHub Pages:"
+          echo "1. Go to Settings → Pages"
+          echo "2. Set Source: Branch '${{ steps.vars.outputs.target_branch }}' /root"
+          echo "3. Save"

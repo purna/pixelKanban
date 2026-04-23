@@ -134,6 +134,38 @@ pixelKanban/
 - Safari (latest)
 - Edge (latest)
 
+## Deployment
+
+### GitHub Pages via Actions
+
+Two workflow options are available:
+
+**Manual Deployment** — Go to *Actions* → *Deploy to GitHub Pages* → *Run workflow*
+- Choose target branch (default: `gh-pages`)
+- Optionally provide custom commit message
+
+**Auto-Deploy** — Automatic on every push to `main`/`master`
+- Deploys to `gh-pages` branch automatically
+- Configured in `.github/workflows/auto-deploy.yml`
+
+After first deployment, enable GitHub Pages:
+1. Repository *Settings* → *Pages*
+2. Source: select the deployed branch (e.g., `gh-pages`) / `root`
+3. Save
+
+Site URL: `https://<username>.github.io/<repo-name>/`
+
+### Local Script
+
+Use the included `deploy.sh` script for local deployments:
+```bash
+./deploy.sh                    # Deploy to gh-pages (with push)
+./deploy.sh pages              # Deploy to 'pages' branch
+./deploy.sh gh-pages --no-push # Build without pushing
+```
+
+The script handles stashing changes, branch switching, file cleanup, and push.
+
 ## Technologies Used
 
 - Vanilla JavaScript (ES6+)

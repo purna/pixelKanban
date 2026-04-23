@@ -158,6 +158,21 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="task-milestone">Milestone</label>
+                        <select id="task-milestone">
+                            <option value="">No Milestone</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="task-labels">Labels</label>
+                        <select id="task-labels" multiple style="height: 120px;">
+                            <option value="">Select labels...</option>
+                        </select>
+                        <small style="color: var(--text-secondary);">Hold Ctrl/Cmd to select multiple</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="task-bg-color">Background Color</label>
                         <div class="color-picker-row">
                             <input type="color" id="task-bg-color" value="#2d2d2d">

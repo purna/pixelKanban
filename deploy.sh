@@ -70,6 +70,13 @@ fi
 # Capture current branch
 CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
 
+# Prevent self-deployment
+if [ "$TARGET_BRANCH" = "$CURRENT_BRANCH" ]; then
+    echo "Error: Target branch '$TARGET_BRANCH' is the same as current branch"
+    echo "  Use a different branch for deployment (e.g., gh-pages)"
+    exit 1
+fi
+
 # Detect if there were uncommitted changes
 STASH_NEEDED=false
 if ! git diff --quiet --cached || ! git diff --quiet || [ "$(git ls-files --others --exclude-standard)" ]; then
@@ -100,17 +107,9 @@ git rm -rf . 2>/dev/null || true
 # Remove untracked files/directories
 git clean -fdx
 
-# Copy files from original branch
+# Copy files from original branch (committed state only)
 echo "Copying files from $CURRENT_BRANCH..."
 git checkout "$CURRENT_BRANCH" -- .
-
-# Apply any stashed changes (uncommitted)
-if [ "$STASH_CREATED" = true ]; then
-    echo "Applying uncommitted changes..."
-    git stash pop || {
-        echo "Warning: Stash pop failed (stash may already be applied)"
-    }
-fi
 
 # Remove excluded items
 echo "Removing excluded files..."
@@ -119,6 +118,10 @@ for item in $EXCLUDE_LIST; do
         rm -rf "$item"
     fi
 done
+
+# Create .nojekyll to disable Jekyll processing on GitHub Pages
+echo "Creating .nojekyll..."
+touch .nojekyll
 
 # Commit deployment
 echo "Committing deployment..."
@@ -146,5 +149,13 @@ fi
 # Return to original branch
 echo "Returning to $CURRENT_BRANCH..."
 git checkout "$CURRENT_BRANCH" 2>/dev/null || true
+
+# Restore uncommitted changes
+if [ "$STASH_CREATED" = true ]; then
+    echo "Restoring uncommitted changes..."
+    git stash pop || {
+        echo "Warning: Failed to restore stash (may be empty or conflicts)"
+    }
+fi
 
 echo "Done."

@@ -1,0 +1,33 @@
+# Auto-deploy on push to main (continuous deployment)
+# Deploys pixelKanban to gh-pages automatically
+name: Auto-Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+jobs:
+  auto-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create .nojekyll (disable Jekyll processing)
+        run: touch .nojekyll
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: .
+          publish_branch: gh-pages
+          exclude_assets: '".github/,deploy.sh,.gitignore,README.md"'
+          commit_message: "Deploy pixelKanban to GitHub Pages (auto)"

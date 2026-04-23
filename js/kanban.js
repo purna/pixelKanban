@@ -34,6 +34,8 @@ class KanbanBoard {
             priority: data.priority || 'medium',
             status: data.status || 'backlog',
             dueDate: data.dueDate || '',
+            milestone: data.milestone || null, // { name: string, number: number } or null
+            labels: data.labels || [], // Array of label names
             backgroundColor: data.backgroundColor || '#2d2d2d',
             attachments: data.attachments || [], // Array of {type, url, name}
             comments: data.comments || [], // Array of {id, userId, text, createdAt}
@@ -144,6 +146,25 @@ class KanbanBoard {
                 dueDateClass = 'due-later';
             }
         }
+        
+        // Determine milestone class for styling
+        let milestoneClass = 'task-milestone-badge';
+        if (task.milestone && task.milestone.name) {
+            const msName = task.milestone.name.toLowerCase().replace(/\s+/g, '-');
+            milestoneClass += ` milestone-${msName}`;
+        }
+
+        // Build label badges HTML
+        let labelsHTML = '';
+        if (task.labels && task.labels.length > 0) {
+            labelsHTML = '<div class="task-labels">';
+            task.labels.forEach(label => {
+                const bgColor = this.getLabelColor(label);
+                const textColor = this.getLabelTextColor(bgColor);
+                labelsHTML += `<span class="task-label-badge" style="background-color: ${bgColor}; color: ${textColor}">${this.escapeHtml(label)}</span>`;
+            });
+            labelsHTML += '</div>';
+        }
 
         // Render attachments as a list
         let attachmentsHTML = '';
@@ -181,6 +202,8 @@ class KanbanBoard {
             </div>
             <div class="task-card-footer">
                 ${dueDate ? `<div class="task-due-date ${dueDateClass}">Due: ${dueDate}</div>` : ''}
+                ${task.milestone && task.milestone.name ? `<div class="${milestoneClass}">${this.escapeHtml(task.milestone.name)}</div>` : ''}
+                ${labelsHTML}
                 <div class="task-created-date">Created: ${createdDate}</div>
                 <div class="task-actions">
                     <button class="task-action-btn edit" data-action="edit" title="Edit Task">
@@ -449,6 +472,43 @@ class KanbanBoard {
         return '';
     }
 
+    // Generate a consistent color for a label based on its name
+    getLabelColor(labelName) {
+        let hash = 0;
+        for (let i = 0; i < labelName.length; i++) {
+            hash = labelName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+        const h = Math.abs(hash % 360);
+        const s = 60 + (Math.abs(hash) % 20);
+        const l = 40 + (Math.abs(hash) % 20);
+        return this.hslToHex(h, s, l);
+    }
+
+    // Convert HSL to hex
+    hslToHex(h, s, l) {
+        s /= 100;
+        l /= 100;
+        const a = s * Math.min(l, 1 - l);
+        const f = n => {
+            const k = (n + h / 30) % 12;
+            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            return Math.round(255 * color).toString(16).padStart(2, '0');
+        };
+        return `${f(0)}${f(8)}${f(4)}`;
+    }
+
+    // Get appropriate text color (black or white) based on background luminance
+    getLabelTextColor(bgHexColor) {
+        // Remove # if present
+        const hex = bgHexColor.replace('#', '');
+        const r = parseInt(hex.substr(0, 2), 16);
+        const g = parseInt(hex.substr(2, 2), 16);
+        const b = parseInt(hex.substr(4, 2), 16);
+        // Calculate luminance
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        return luminance > 0.5 ? '#000000' : '#ffffff';
+    }
+
     // Open email modal
     openEmailModal(email, taskTitle) {
         if (!email) return;
@@ -511,10 +571,11 @@ class KanbanBoard {
     }
 
     // Modal Management
-    openTaskModal(task = null) {
+    async openTaskModal(task = null) {
         const modal = document.getElementById('task-modal');
         const form = document.getElementById('task-form');
         const title = document.getElementById('task-modal-title');
+        const milestoneSelect = document.getElementById('task-milestone');
 
         if (task) {
             title.textContent = 'Edit Task';
@@ -540,6 +601,25 @@ class KanbanBoard {
         }
 
         this.populateAssigneeDropdown();
+        await this.populateMilestoneDropdown();
+        await this.populateLabelsDropdown();
+
+        // Set milestone after populating dropdown
+        if (task && milestoneSelect) {
+            milestoneSelect.value = task.milestone ? task.milestone.name || task.milestone : '';
+        } else if (milestoneSelect) {
+            milestoneSelect.value = '';
+        }
+
+        // Set labels after populating dropdown
+        const labelsSelect = document.getElementById('task-labels');
+        if (labelsSelect && task && task.labels) {
+            task.labels.forEach(labelName => {
+                const option = labelsSelect.querySelector(`option[value="${labelName}"]`);
+                if (option) option.selected = true;
+            });
+        }
+
         this.setupAttachmentListeners();
         this.setupCommentListeners();
         this.setupColorPickerListeners();
@@ -1030,8 +1110,19 @@ class KanbanBoard {
         this.showNotification('Comment deleted', 'success');
     }
 
+    // Get selected labels from the labels select element
+    getSelectedLabels() {
+        const select = document.getElementById('task-labels');
+        if (!select) return [];
+        return Array.from(select.selectedOptions).map(option => option.value);
+    }
+
     // Close task modal
     closeTaskModal() {
+        const select = document.getElementById('task-labels');
+        if (select) {
+            select.selectedIndex = 0;
+        }
         document.getElementById('task-modal').classList.remove('active');
         this.currentTaskId = null;
         this.currentAttachments = [];
@@ -1250,6 +1341,17 @@ class KanbanBoard {
         const form = document.getElementById('task-form');
         const taskId = form.dataset.taskId;
         
+        // Get milestone value
+        const milestoneSelect = document.getElementById('task-milestone');
+        let milestone = null;
+        if (milestoneSelect && milestoneSelect.value) {
+            const selectedOption = milestoneSelect.selectedOptions[0];
+            milestone = {
+                name: milestoneSelect.value,
+                number: parseInt(selectedOption.dataset.number) || null
+            };
+        }
+        
         // Get form values directly
         const taskData = {
             emoji: document.getElementById('task-emoji').value,
@@ -1258,8 +1360,10 @@ class KanbanBoard {
             assignee: document.getElementById('task-assignee').value,
             priority: document.getElementById('task-priority').value,
             dueDate: document.getElementById('task-due-date').value,
+            milestone: milestone,
             backgroundColor: document.getElementById('task-bg-color').value,
-            attachments: this.currentAttachments || []
+            attachments: this.currentAttachments || [],
+            labels: this.getSelectedLabels()
         };
 
         if (taskId) {
@@ -1316,6 +1420,113 @@ class KanbanBoard {
         }
 
         select.value = currentValue;
+    }
+
+    // GitHub Milestone Integration
+    async populateMilestoneDropdown() {
+        const select = document.getElementById('task-milestone');
+        if (!select) return;
+        
+        const currentValue = select.value;
+        
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">No Milestone</option>';
+        
+        // Disable if GitHub integration not active
+        if (!window.githubBoardsUI || !window.githubBoardsUI.githubBoards.isConnected()) {
+            select.disabled = true;
+            select.title = 'Connect to GitHub to use milestones';
+            return;
+        }
+        
+        const repo = window.githubBoardsUI.githubBoards.getSelectedRepo();
+        if (!repo) {
+            select.disabled = true;
+            select.title = 'Select a repository to use milestones';
+            return;
+        }
+        
+        select.disabled = false;
+        select.title = '';
+        
+        try {
+            const milestones = await window.githubBoardsUI.githubBoards.api.getRepoMilestones(
+                repo.owner.login,
+                repo.name
+            );
+            
+            milestones.forEach(ms => {
+                const option = document.createElement('option');
+                option.value = ms.title;
+                option.textContent = ms.title;
+                // Store number as data attribute
+                option.dataset.number = ms.number;
+                select.appendChild(option);
+            });
+            
+            // Restore selection if editing
+            select.value = currentValue;
+            
+        } catch (error) {
+            console.warn('Failed to load milestones:', error);
+            select.disabled = true;
+            select.title = 'Failed to load milestones';
+        }
+    }
+
+    // GitHub Labels Integration
+    async populateLabelsDropdown() {
+        const select = document.getElementById('task-labels');
+        if (!select) return;
+
+        const currentSelection = Array.from(select.selectedOptions).map(opt => opt.value);
+
+        // Clear existing options except the first placeholder
+        select.innerHTML = '<option value="">Select labels...</option>';
+
+        // Disable if GitHub integration not active
+        if (!window.githubBoardsUI || !window.githubBoardsUI.githubBoards.isConnected()) {
+            select.disabled = true;
+            select.title = 'Connect to GitHub to use labels';
+            return;
+        }
+
+        const repo = window.githubBoardsUI.githubBoards.getSelectedRepo();
+        if (!repo) {
+            select.disabled = true;
+            select.title = 'Select a repository to use labels';
+            return;
+        }
+
+        select.disabled = false;
+        select.title = 'Hold Ctrl/Cmd to select multiple';
+
+        try {
+            const labels = await window.githubBoardsUI.githubBoards.api.getRepoLabels(
+                repo.owner.login,
+                repo.name
+            );
+
+            labels.forEach(label => {
+                const option = document.createElement('option');
+                option.value = label.name;
+                option.textContent = label.name;
+                // Store color as data attribute for styling
+                option.dataset.color = label.color;
+                select.appendChild(option);
+            });
+
+            // Restore selection if editing
+            currentSelection.forEach(val => {
+                const option = select.querySelector(`option[value="${val}"]`);
+                if (option) option.selected = true;
+            });
+
+        } catch (error) {
+            console.warn('Failed to load labels:', error);
+            select.disabled = true;
+            select.title = 'Failed to load labels';
+        }
     }
 
     getUserName(userId) {

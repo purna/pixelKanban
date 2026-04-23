@@ -556,6 +556,56 @@ header {
     color: #fff;
 }
 
+/* Task Milestone Badge */
+.task-milestone-badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: var(--bg-medium);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    margin-top: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.task-milestone-badge.milestone-backlog { background: #6e7681; color: #fff; }
+.task-milestone-badge.milestone-todo { background: #0e7a86; color: #fff; }
+.task-milestone-badge.milestone-in-progress { background: #a371f7; color: #fff; }
+.task-milestone-badge.milestone-done { background: #3fb950; color: #fff; }
+.task-milestone-badge.milestone-sprint-1 { background: #f7d358; color: #000; }
+.task-milestone-badge.milestone-sprint-2 { background: #ff6b6b; color: #fff; }
+.task-milestone-badge.milestone-release { background: #4ecdc4; color: #000; }
+
+/* Task Labels Badge */
+.task-labels {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+}
+
+.task-label-badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 10px;
+    font-size: 0.7em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+
 .task-due-date {
     font-size: 0.75rem;
     font-weight: 500;

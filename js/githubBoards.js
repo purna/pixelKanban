@@ -220,7 +220,7 @@ class GitHubAPI {
     /**
      * Create a new issue in a repository
      */
-    async createIssue(owner, repo, title, body = '', labels = [], assignees = []) {
+    async createIssue(owner, repo, title, body = '', labels = [], assignees = [], milestone = null) {
         const issue = await this.request(`/repos/${owner}/${repo}/issues`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -228,7 +228,8 @@ class GitHubAPI {
                 title,
                 body,
                 labels,
-                assignees
+                assignees,
+                milestone: milestone ? { number: milestone } : null
             })
         });
         return issue;
@@ -238,6 +239,27 @@ class GitHubAPI {
      * Update an issue
      */
     async updateIssue(owner, repo, issueNumber, updates = {}) {
+        // Convert milestone to the correct format for GitHub API { number: X }
+        if (updates.milestone) {
+            if (typeof updates.milestone === 'string' && updates.milestone.trim() !== '') {
+                // It's a milestone name string? Actually we might store number as string.
+                // If it's numeric string, treat as number
+                const num = parseInt(updates.milestone);
+                if (!isNaN(num)) {
+                    updates.milestone = { number: num };
+                } else {
+                    // It's a name - we should have resolved earlier, but treat as null
+                    updates.milestone = null;
+                }
+            } else if (typeof updates.milestone === 'number') {
+                updates.milestone = { number: updates.milestone };
+            } else if (typeof updates.milestone === 'object' && updates.milestone.number) {
+                // Already in correct format
+            } else {
+                updates.milestone = null;
+            }
+        }
+        
         const issue = await this.request(`/repos/${owner}/${repo}/issues/${issueNumber}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -318,6 +340,38 @@ class GitHubAPI {
     async getRepoCollaborators(owner, repo) {
         const collaborators = await this.request(`/repos/${owner}/${repo}/collaborators?per_page=100`);
         return collaborators;
+    }
+
+    /**
+     * Get repository milestones
+     */
+    async getRepoMilestones(owner, repo, state = 'open') {
+        const milestones = await this.request(`/repos/${owner}/${repo}/milestones?state=${state}&per_page=100`);
+        return milestones;
+    }
+
+    /**
+     * Get milestone by name
+     */
+    async getMilestoneByName(owner, repo, name) {
+        const milestones = await this.getRepoMilestones(owner, repo);
+        return milestones.find(m => m.title.toLowerCase() === name.toLowerCase()) || null;
+    }
+
+    /**
+     * Create a milestone
+     */
+    async createMilestone(owner, repo, title, description = '', color = 'ffffff') {
+        const milestone = await this.request(`/repos/${owner}/${repo}/milestones`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                title,
+                description,
+                color
+            })
+        });
+        return milestone;
     }
 
     /**
@@ -461,6 +515,7 @@ class GitHubBoards {
         try {
             const existingIssues = await this.api.getRepoIssues(repo.owner.login, repo.name, 'all');
             const existingLabels = await this.api.getRepoLabels(repo.owner.login, repo.name);
+            const existingMilestones = await this.api.getRepoMilestones(repo.owner.login, repo.name);
             
             // Create label mapping
             const labelMap = {};
@@ -482,42 +537,81 @@ class GitHubBoards {
                 }
             }
 
-            // Get updated labels
-            const updatedLabels = await this.api.getRepoLabels(repo.owner.login, repo.name);
-            const newLabelMap = {};
-            updatedLabels.forEach(label => {
-                newLabelMap[label.name.toLowerCase()] = label.name;
+            // Create milestone mapping
+            const milestoneMap = {};
+            existingMilestones.forEach(ms => {
+                milestoneMap[ms.title.toLowerCase()] = ms;
             });
 
             // Push each task as an issue
             for (const task of kanbanBoard.tasks) {
                 const statusLabel = this.getStatusLabel(task.status);
-                
+
                 // Find existing issue by title
                 const existingIssue = existingIssues.find(i => i.title === task.title);
-                
+
+                // Combine task labels with status label (deduplicated)
+                const taskLabels = task.labels || [];
+                const allLabels = [...new Set([statusLabel, ...taskLabels])];
+
+                // Ensure all labels exist on GitHub (create missing ones)
+                for (const labelName of allLabels) {
+                    if (!labelMap[labelName.toLowerCase()]) {
+                        // Generate a color for this label
+                        const labelColor = this.getLabelColor(labelName);
+                        const newLabel = await this.api.createLabel(repo.owner.login, repo.name, labelName, labelColor);
+                        labelMap[labelName.toLowerCase()] = newLabel;
+                    }
+                }
+
+                // Handle milestone if task has one
+                let milestoneNumber = null;
+                if (task.milestone && task.milestone.name) {
+                    const milestoneName = task.milestone.name.toLowerCase();
+                    if (milestoneMap[milestoneName]) {
+                        milestoneNumber = milestoneMap[milestoneName].number;
+                    } else {
+                        // Create the milestone
+                        const milestoneColors = githubConfig.milestoneColors || {};
+                        const colorKey = Object.keys(milestoneColors).find(key => key.toLowerCase() === milestoneName);
+                        const color = colorKey ? milestoneColors[colorKey] : '9ca3af';
+                        const newMilestone = await this.api.createMilestone(
+                            repo.owner.login,
+                            repo.name,
+                            task.milestone.name,
+                            '',
+                            color
+                        );
+                        milestoneNumber = newMilestone.number;
+                        milestoneMap[milestoneName] = newMilestone;
+                    }
+                }
+
                 if (existingIssue) {
                     // Update existing issue
                     const updates = {
                         body: this.formatTaskBody(task),
-                        labels: [newLabelMap[statusLabel]].filter(Boolean)
+                        labels: allLabels
                     };
-                    
+
                     if (task.assignee) {
                         const user = await this.getAssigneeLogin(task.assignee);
                         if (user) {
                             updates.assignees = [user];
                         }
                     }
-                    
+
+                    if (milestoneNumber) {
+                        updates.milestone = milestoneNumber;
+                    }
+
                     await this.api.updateIssue(repo.owner.login, repo.name, existingIssue.number, updates);
                 } else {
                     // Create new issue
-                    const labels = [newLabelMap[statusLabel]].filter(Boolean);
                     const body = this.formatTaskBody(task);
                     const assignees = task.assignee ? [await this.getAssigneeLogin(task.assignee)].filter(Boolean) : [];
-                    
-                    await this.api.createIssue(repo.owner.login, repo.name, task.title, body, labels, assignees);
+
+                    await this.api.createIssue(repo.owner.login, repo.name, task.title, body, allLabels, assignees, milestoneNumber);
                 }
             }
 
@@ -560,10 +654,22 @@ class GitHubBoards {
             for (const issue of issues) {
                 const status = this.getKanbanStatus(issue.labels);
                 const assignee = issue.assignees.length > 0 ? issue.assignees[0].login : '';
-                
+
                 // Parse body for additional task info
                 const taskData = this.parseTaskBody(issue.body);
-                
+
+                // Extract milestone
+                let milestone = null;
+                if (issue.milestone) {
+                    milestone = {
+                        number: issue.milestone.number,
+                        title: issue.milestone.title
+                    };
+                }
+
+                // Store all labels from the issue
+                const labels = issue.labels.map(l => l.name);
+
                 tasks.push({
                     id: nextTaskId++,
                     title: issue.title,
@@ -572,6 +678,8 @@ class GitHubBoards {
                     priority: taskData.priority || 'medium',
                     assignee: assignee,
                     dueDate: taskData.dueDate || '',
+                    milestone: milestone,
+                    labels: labels,
                     comments: taskData.comments || [],
                     attachments: taskData.attachments || [],
                     createdAt: issue.created_at,
@@ -630,11 +738,45 @@ class GitHubBoards {
      */
     getKanbanStatus(labels) {
         const labelNames = labels.map(l => l.name.toLowerCase());
-        
+
         if (labelNames.includes('done')) return 'done';
         if (labelNames.includes('in progress')) return 'in-progress';
         if (labelNames.includes('to do')) return 'todo';
         return 'backlog';
+    }
+
+    /**
+     * Get a color for a label (generate consistent color from name)
+     */
+    getLabelColor(labelName) {
+        // Use a hash of the label name to generate a consistent color
+        let hash = 0;
+        for (let i = 0; i < labelName.length; i++) {
+            hash = labelName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        // Generate a pastel-like color (avoid too dark or too light)
+        const h = Math.abs(hash % 360);
+        const s = 60 + (Math.abs(hash) % 20); // 60-80%
+        const l = 40 + (Math.abs(hash) % 20); // 40-60%
+
+        // Convert HSL to hex
+        return this.hslToHex(h, s, l);
+    }
+
+    /**
+     * Convert HSL to hex
+     */
+    hslToHex(h, s, l) {
+        s /= 100;
+        l /= 100;
+        const a = s * Math.min(l, 1 - l);
+        const f = n => {
+            const k = (n + h / 30) % 12;
+            const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+            return Math.round(255 * color).toString(16).padStart(2, '0');
+        };
+        return `${f(0)}${f(8)}${f(4)}`;
     }
 
     /**
@@ -651,16 +793,22 @@ class GitHubBoards {
             body += `\n\n**Due Date:** ${task.dueDate}`;
         }
         
+        if (task.milestone && task.milestone.name) {
+            body += `\n\n**Milestone:** ${task.milestone.name}`;
+        }
+        
         // Add metadata as JSON for parsing on pull
         const metadata = {
             _pixelKanban: true,
             priority: task.priority,
             dueDate: task.dueDate,
+            milestone: task.milestone || null,
+            labels: task.labels || [],
             description: task.description,
             comments: task.comments || [],
             attachments: task.attachments || []
         };
-        
+
         body += `\n\n<!-- pixelKanban metadata:\n${JSON.stringify(metadata)}\n-->`;
         
         return body;
@@ -671,7 +819,7 @@ class GitHubBoards {
      */
     parseTaskBody(body) {
         if (!body) return {};
-        
+
         try {
             // Try to extract metadata from comment
             const match = body.match(/<!-- pixelKanban metadata:\n([\s\S]*?)\n-->/);
@@ -681,14 +829,17 @@ class GitHubBoards {
         } catch (e) {
             console.warn('Could not parse task metadata:', e);
         }
-        
-        // Parse basic info from body
+
+        // Parse basic info from body (fallback for old tasks)
         const priorityMatch = body.match(/\*\*Priority:\*\* (\w+)/);
         const dueDateMatch = body.match(/\*\*Due Date:\*\* ([\d-]+)/);
-        
+        const milestoneMatch = body.match(/\*\*Milestone:\*\* (.+)/);
+
         return {
             priority: priorityMatch ? priorityMatch[1] : 'medium',
             dueDate: dueDateMatch ? dueDateMatch[1] : '',
+            milestone: milestoneMatch ? { name: milestoneMatch[1].trim() } : null,
+            labels: [],
             description: body.replace(/<!--[\s\S]*?-->/, '').replace(/\*\*.*?\*\*/g, '').trim()
         };
     }
