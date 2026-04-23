@@ -16,15 +16,6 @@ Trigger manually from the Actions tab whenever you want.
 3. Enable Pages: Settings → Pages → branch `gh-pages` / root
 4. Board is live at `https://<owner>.github.io/<repo>/`
 
-### auto-deploy-kanban.yml — Auto deploy on push
-Deploys automatically on every push to `main` or `master`.
-
-**How to use:**
-1. Copy `auto-deploy-kanban.yml` to `.github/workflows/` in any repo
-2. Push any commit to `main` — workflow triggers automatically
-3. Enable Pages: Settings → Pages → branch `gh-pages` / root
-4. Board is live at `https://<owner>.github.io/<repo>/`
-
 ---
 
 ## How it works
