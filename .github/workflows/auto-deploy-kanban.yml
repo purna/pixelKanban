@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: write
+  workflows: write
 
 jobs:
   deploy:
@@ -24,6 +25,9 @@ jobs:
       - name: Clone pixelKanban source
         run: git clone https://github.com/purna/pixelKanban.git _kanban_src
 
+      - name: Remove workflows from source
+        run: rm -rf _kanban_src/.github
+
       - name: Patch config to this repo's issues
         run: |
           OWNER=$(echo "${{ github.repository }}" | cut -d'/' -f1)
@@ -37,5 +41,4 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: _kanban_src
           publish_branch: gh-pages
-          exclude_assets: '".github/"'
           commit_message: "Deploy pixelKanban — ${{ github.sha }}"

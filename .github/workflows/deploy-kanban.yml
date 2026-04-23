@@ -20,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      workflows: write
 
     steps:
       - name: Checkout target repo
@@ -35,6 +36,9 @@ jobs:
       - name: Clone pixelKanban source
         run: |
           git clone https://github.com/purna/pixelKanban.git _kanban_src
+
+      - name: Remove workflows from source
+        run: rm -rf _kanban_src/.github
 
       - name: Patch config to this repo's issues
         run: |
@@ -57,7 +61,7 @@ jobs:
       - name: Copy kanban files
         run: |
           cp -r _kanban_src/. .
-          rm -rf _kanban_src .github
+          rm -rf _kanban_src
           touch .nojekyll
 
       - name: Commit and push
