@@ -563,7 +563,7 @@ class GitHubBoards {
                 const existingIssue = existingIssues.find(i => i.title === task.title);
 
                 // Combine task labels with status label (deduplicated)
-                const taskLabels = task.labels || [];
+                const taskLabels = (task.labels || []).map(l => typeof l === 'object' ? l.name : l);
                 const allLabels = [...new Set([statusLabel, ...taskLabels])];
 
                 // Ensure all labels exist on GitHub (create missing ones)
@@ -679,8 +679,11 @@ class GitHubBoards {
                     };
                 }
 
-                // Store all labels from the issue
-                const labels = issue.labels.map(l => l.name);
+                // Store all labels from the issue as objects with name and color
+                const labels = issue.labels.map(l => ({
+                    name: l.name,
+                    color: l.color
+                }));
 
                 tasks.push({
                     id: nextTaskId++,
@@ -1251,16 +1254,20 @@ class GitHubBoardsUI {
         if (status.connected) {
             loginForm.style.display = 'none';
             connectedView.style.display = 'block';
-            connectionStatus.textContent = `Connected as ${status.user.login}`;
-            
-            // Update user info
-            const avatar = document.getElementById('github-user-avatar');
-            const name = document.getElementById('github-user-name');
-            const login = document.getElementById('github-user-login');
-            
-            if (status.user.avatar_url) avatar.src = status.user.avatar_url;
-            name.textContent = status.user.name || status.user.login;
-            login.textContent = `@${status.user.login}`;
+            if (status.user) {
+                connectionStatus.textContent = `Connected as ${status.user.login}`;
+                
+                // Update user info
+                const avatar = document.getElementById('github-user-avatar');
+                const name = document.getElementById('github-user-name');
+                const login = document.getElementById('github-user-login');
+                
+                if (status.user.avatar_url) avatar.src = status.user.avatar_url;
+                name.textContent = status.user.name || status.user.login;
+                login.textContent = `@${status.user.login}`;
+            } else {
+                connectionStatus.textContent = 'Connected';
+            }
             
             // Load repositories if not loaded
             this.loadRepositories();

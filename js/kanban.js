@@ -11,7 +11,38 @@ class KanbanBoard {
             count: 4,
             names: ['Backlog', 'To Do', 'In Progress', 'Done']
         };
+        // Cache for GitHub label colors: { labelName: 'hexcolor' }
+        this.labelColorMap = {};
         this.init();
+    }
+
+    /**
+     * Get a color for a label - accepts string label name or object {name, color}
+     * Prefers GitHub label color if cached or provided, otherwise generates a consistent color
+     */
+    getLabelColor(label) {
+        // If label is an object with color property, use it
+        if (typeof label === 'object' && label && label.color) {
+            return '#' + label.color;
+        }
+
+        // If label is a string, check cache first
+        const labelName = typeof label === 'string' ? label : (label?.name || '');
+        if (this.labelColorMap && this.labelColorMap[labelName]) {
+            return '#' + this.labelColorMap[labelName];
+        }
+
+        // Fallback: generate consistent color from name
+        let hash = 0;
+        for (let i = 0; i < labelName.length; i++) {
+            hash = labelName.charCodeAt(i) + ((hash << 5) - hash);
+        }
+
+        const h = Math.abs(hash % 360);
+        const s = 60 + (Math.abs(hash) % 20);
+        const l = 40 + (Math.abs(hash) % 20);
+
+        return this.hslToHex(h, s, l);
     }
 
     init() {
@@ -161,9 +192,10 @@ class KanbanBoard {
         if (task.labels && task.labels.length > 0) {
             labelsHTML = '<div class="task-labels">';
             task.labels.forEach(label => {
+                const labelName = typeof label === 'object' ? label.name : label;
                 const bgColor = this.getLabelColor(label);
                 const textColor = this.getLabelTextColor(bgColor);
-                labelsHTML += `<span class="task-label-badge" style="background-color: ${bgColor}; color: ${textColor}">${this.escapeHtml(label)}</span>`;
+                labelsHTML += `<span class="task-label-badge" style="background-color: ${bgColor}; color: ${textColor}">${this.escapeHtml(labelName)}</span>`;
             });
             labelsHTML += '</div>';
         }
@@ -637,7 +669,8 @@ class KanbanBoard {
         // Set labels after populating dropdown
         const labelsSelect = document.getElementById('task-labels');
         if (labelsSelect && task && task.labels) {
-            task.labels.forEach(labelName => {
+            task.labels.forEach(label => {
+                const labelName = typeof label === 'object' ? label.name : label;
                 const option = labelsSelect.querySelector(`option[value="${labelName}"]`);
                 if (option) option.selected = true;
             });
@@ -1603,6 +1636,15 @@ class KanbanBoard {
                 repo.owner.login,
                 repo.name
             );
+
+            // Sort labels alphabetically for better UX
+            labels.sort((a, b) => a.name.localeCompare(b.name));
+
+            // Update labelColorMap cache with GitHub label colors
+            this.labelColorMap = this.labelColorMap || {};
+            labels.forEach(label => {
+                this.labelColorMap[label.name] = label.color;
+            });
 
             labels.forEach(label => {
                 const option = document.createElement('option');
