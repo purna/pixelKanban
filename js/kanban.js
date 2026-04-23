@@ -301,7 +301,7 @@ class KanbanBoard {
             </div>
             <div class="task-card-footer">
                 ${dueDate ? `<div class="task-due-date ${dueDateClass}">Due: ${dueDate}</div>` : ''}
-                ${task.milestone && task.milestone.name ? `<div class="${milestoneClass}">${this.escapeHtml(task.milestone.name)}</div>` : ''}
+                ${milestoneName ? `<div class="${milestoneClass}">${this.escapeHtml(milestoneName)}</div>` : ''}
                 ${labelsHTML}
                 <div class="task-created-date">Created: ${createdDate}</div>
                 <div class="task-actions">
@@ -699,8 +699,8 @@ class KanbanBoard {
 
         // Set milestone after populating dropdown — match by number
         if (task && milestoneSelect && task.milestone) {
-            const num = task.milestone.number;
-            const title = task.milestone.name || task.milestone.title || task.milestone;
+            const num = task.milestone.number || null;
+            const title = this.getMilestoneDisplayName(task.milestone);
             // Try matching by number first, then by title text
             const byNum = num ? [...milestoneSelect.options].find(o => String(o.dataset.number) === String(num)) : null;
             const byTitle = title ? [...milestoneSelect.options].find(o => o.dataset.title === title || o.textContent === title) : null;
