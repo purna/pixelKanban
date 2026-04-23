@@ -19,29 +19,70 @@ class DatabaseManager {
     }
 
     isGitHubConnected() {
-        return window.githubBoardsUI?.isConnected() || false;
+        // Check if GitHubBoardsUI is available and its GitHubBoards instance is connected
+        return window.githubBoardsUI?.githubBoards?.isConnected() || false;
     }
 
     getSelectedRepo() {
-        return window.githubBoardsUI?.getSelectedRepo();
+        return window.githubBoardsUI?.githubBoards?.getSelectedRepo();
     }
 
     async saveBoardToDatabase(boardName = null) {
         const boardToSave = boardName || (this.boardManager?.currentBoardName || 'default');
         const repo = this.getSelectedRepo();
         
-        // Validate GitHub connection - check both UI connection and actual token
-        if (!window.githubBoardsUI?.isConnected()) {
+        if (!this.isGitHubConnected()) {
             this.showNotification('Connect to GitHub first (click GitHub button)', 'error');
             return false;
         }
         
+        if (!repo) {
+            this.showNotification('Select a repository in GitHub modal', 'error');
+            return false;
+        }
+
+        try {
+            const tasks = this.kanbanBoard?.tasks || [];
+            this.showNotification(`Saving ${tasks.length} tasks...`, 'info');
+            
+            let savedCount = 0;
+            let errorCount = 0;
+            
+            for (const task of tasks) {
+                try {
+                    await this.saveTaskAsIssue(task, repo);
+                    savedCount++;
+                } catch (taskError) {
+                    console.error(`Failed to save task "${task.title}":`, taskError);
+                    errorCount++;
+                }
+            }
+            
+            if (errorCount > 0) {
+                this.showNotification(`Saved ${savedCount} tasks with ${errorCount} errors`, 'warning');
+            } else {
+                this.showNotification(`Saved ${savedCount} tasks to ${repo.fullName}`, 'success');
+            }
+            
+            // Save local board state after successful sync
+            if (this.boardManager) {
+                this.boardManager.saveCurrentBoard();
+            }
+            
+            return savedCount > 0;
+        } catch (error) {
+            console.error('Error saving board:', error);
+            this.showNotification('Error: ' + error.message, 'error');
+            return false;
+        }
+    }
+        
         // Verify token is valid by attempting an API call
         try {
-            await window.githubBoardsUI.api.getCurrentUser();
+            await window.githubBoardsUI?.githubBoards?.api?.getCurrentUser();
         } catch (error) {
             this.showNotification('GitHub authentication invalid. Please reconnect.', 'error');
-            window.githubBoards?.disconnect();
+            window.githubBoardsUI?.githubBoards?.disconnect?.();
             return false;
         }
         
@@ -87,10 +128,66 @@ class DatabaseManager {
     }
 
     async saveTaskAsIssue(task, repo) {
-        const { api } = window.githubBoardsUI;
-        if (!api?.isAuthenticated()) {
+        const githubBoards = window.githubBoardsUI?.githubBoards;
+        if (!githubBoards?.isAuthenticated()) {
             throw new Error('GitHub API not authenticated. Please reconnect.');
         }
+        const { api } = githubBoards;
+
+        // Build comprehensive metadata for full task restoration
+        const metadata = {
+            column: task.columnId,
+            taskId: task.id,
+            priority: task.priority,
+            dueDate: task.dueDate || '',
+            milestone: task.milestone || null,
+            labels: task.labels || [],
+            project: task.project || null,
+            parentIssueId: task.parentIssueId || null,
+            comments: task.comments || [],
+            attachments: task.attachments || []
+        };
+
+        const metadataBlock = `<!-- pixelKanban metadata:\n${JSON.stringify(metadata)}\n-->`;
+        const body = `${task.description || ''}\n\n${metadataBlock}`.trim();
+
+        // Build labels list - include status label from column plus any task-specific labels
+        const labels = [this.getColumnLabel(task.columnId)];
+        if (task.labels && Array.isArray(task.labels)) {
+            labels.push(...task.labels);
+        }
+
+        const issueData = {
+            title: task.title,
+            body: body,
+            labels: [...new Set(labels)]
+        };
+
+        // Include milestone number if available
+        if (task.milestone && task.milestone.number) {
+            issueData.milestone = task.milestone.number;
+        }
+
+        // Create or update the issue
+        if (task.githubIssueId) {
+            try {
+                await api.request(`/repos/${repo.owner.login}/${repo.name}/issues/${task.githubIssueId}`, {
+                    method: 'PATCH',
+                    body: JSON.stringify(issueData)
+                });
+                return;
+            } catch (e) {
+                console.warn(`Failed to update issue #${task.githubIssueId}, creating new:`, e.message);
+                task.githubIssueId = null;
+            }
+        }
+
+        const response = await api.request(`/repos/${repo.owner.login}/${repo.name}/issues`, {
+            method: 'POST',
+            body: JSON.stringify(issueData)
+        });
+        task.githubIssueId = response.number;
+    }
 
         // Build metadata for kanban column mapping
         const metadata = `<!-- kanban-metadata \ncolumn: ${task.columnId}\ntaskId: ${task.id}\n-->`;
@@ -102,11 +199,17 @@ class DatabaseManager {
             labels.push(...task.labels);
         }
 
+        // Prepare issue data
         const issueData = {
             title: task.title,
             body: body,
             labels: [...new Set(labels)]
         };
+
+        // Include milestone if present
+        if (task.milestone && task.milestone.name) {
+            issueData.milestone = task.milestone.number || task.milestone.name;
+        }
 
         // Update existing issue or create new one
         if (task.githubIssueId) {
@@ -142,7 +245,7 @@ class DatabaseManager {
     async loadBoardFromDatabase() {
         const repo = this.getSelectedRepo();
         
-        if (!window.githubBoardsUI?.isConnected()) {
+        if (!this.isGitHubConnected()) {
             this.showNotification('Connect to GitHub first', 'error');
             return false;
         }
@@ -155,7 +258,12 @@ class DatabaseManager {
         try {
             this.showNotification('Loading from GitHub Issues...', 'info');
             
-            const issues = await window.githubBoardsUI.api.request(
+            const githubBoards = window.githubBoardsUI?.githubBoards;
+            if (!githubBoards) {
+                throw new Error('GitHub integration not initialized');
+            }
+            
+            const issues = await githubBoards.api.request(
                 `/repos/${repo.owner.login}/${repo.name}/issues?state=all&per_page=100`
             );
             
@@ -180,16 +288,112 @@ class DatabaseManager {
     issueToTask(issue) {
         let columnId = 'backlog';
         let taskId = issue.number;
-        
+        let priority = 'medium';
+        let dueDate = '';
+        let milestone = null;
+        let project = null;
+        let parentIssueId = null;
+        let comments = [];
+        let attachments = [];
+
+        const assignee = issue.assignee ? issue.assignee.login : null;
+        const description = issue.body?.replace(/<!--[\s\S]*?-->/, '').trim() || '';
+
+        // Labels array
+        const labels = issue.labels?.map(l => l.name) || [];
+
+        // Extract metadata if present
         if (issue.body) {
-            const match = issue.body.match(/<!-- kanban-metadata \ncolumn: (\w+)\ntaskId: (\d+)\n-->/);
-            if (match) {
-                columnId = match[1];
-                taskId = parseInt(match[2]);
+            const metaMatch = issue.body.match(/<!-- pixelKanban metadata:\n([\s\S]*?)\n-->/);
+            if (metaMatch) {
+                try {
+                    const meta = JSON.parse(metaMatch[1]);
+                    columnId = meta.column || columnId;
+                    taskId = meta.taskId || taskId;
+                    priority = meta.priority || priority;
+                    dueDate = meta.dueDate || '';
+                    milestone = meta.milestone || null;
+                    project = meta.project || null;
+                    parentIssueId = meta.parentIssueId || null;
+                    comments = meta.comments || [];
+                    attachments = meta.attachments || [];
+                } catch (e) {
+                    console.warn('Failed to parse task metadata:', e);
+                }
             }
+        }
+
+        // If column not set from metadata, infer from labels (supporting both simple and kanban: prefixes)
+        if (columnId === 'backlog' || columnId === '') {
+            const lowerLabels = labels.map(l => l.toLowerCase());
+            if (lowerLabels.includes('done')) columnId = 'done';
+            else if (lowerLabels.includes('in progress')) columnId = 'in-progress';
+            else if (lowerLabels.includes('to do')) columnId = 'todo';
+            else if (lowerLabels.includes('kanban:backlog')) columnId = 'backlog';
+            else if (lowerLabels.includes('kanban:in-progress')) columnId = 'in-progress';
+            else if (lowerLabels.includes('kanban:todo')) columnId = 'todo';
+            else columnId = 'backlog';
+        }
+
+        return {
+            id: taskId,
+            title: issue.title,
+            description: description,
+            columnId: columnId,
+            assignee: assignee,
+            priority: priority,
+            dueDate: dueDate,
+            milestone: milestone,
+            project: project,
+            parentIssueId: parentIssueId,
+            labels: labels,
+            comments: comments,
+            attachments: attachments,
+            githubIssueId: issue.number
+        };
+    }
+            } else {
+                // Legacy simple metadata fallback: column and taskId only
+                // Also try derive column from labels
+                const labelNames = (issue.labels || []).map(l => l.name.toLowerCase());
+                if (labelNames.includes('done')) columnId = 'done';
+                else if (labelNames.includes('in progress')) columnId = 'in-progress';
+                else if (labelNames.includes('to do')) columnId = 'todo';
+                else columnId = 'backlog';
+            }
+        }
+
+        const labels = issue.labels?.map(l => l.name) || [];
+
+        return {
+            id: taskId,
+            title: issue.title,
+            description: description,
+            columnId: columnId,
+            assignee: assignee,
+            priority: priority,
+            dueDate: dueDate,
+            milestone: milestone,
+            project: project,
+            parentIssueId: parentIssueId,
+            labels: labels,
+            comments: comments,
+            attachments: attachments,
+            githubIssueId: issue.number
+        };
+    }
         }
         
         const assignee = issue.assignee ? issue.assignee.login : null;
+
+        // Extract milestone if present
+        let milestone = null;
+        if (issue.milestone) {
+            milestone = {
+                number: issue.milestone.number,
+                name: issue.milestone.title
+            };
+        }
 
         return {
             id: taskId,
@@ -199,6 +403,7 @@ class DatabaseManager {
             assignee: assignee,
             priority: issue.labels?.find(l => l.name?.startsWith('priority:'))?.name || 'none',
             labels: issue.labels?.map(l => l.name) || [],
+            milestone: milestone,
             githubIssueId: issue.number
         };
     }
@@ -308,7 +513,7 @@ class DatabaseUI {
 
         document.getElementById('db-save-btn')?.addEventListener('click', async () => {
             const githubUI = this.getGitHubUI();
-            if (!githubUI?.isConnected()) {
+            if (!githubUI?.githubBoards?.isConnected()) {
                 this.showStatus('Connect GitHub first', 'error');
                 githubUI?.openModal();
                 return;
@@ -318,7 +523,7 @@ class DatabaseUI {
 
         document.getElementById('db-load-btn')?.addEventListener('click', async () => {
             const githubUI = this.getGitHubUI();
-            if (!githubUI?.isConnected()) {
+            if (!githubUI?.githubBoards?.isConnected()) {
                 this.showStatus('Connect GitHub first', 'error');
                 githubUI?.openModal();
                 return;
@@ -364,9 +569,9 @@ class DatabaseUI {
         
         const githubUI = this.getGitHubUI();
         
-        if (githubUI?.isConnected()) {
-            const repo = githubUI.getSelectedRepo();
-            const user = githubUI.api?.user;
+        if (githubUI?.githubBoards?.isConnected()) {
+            const repo = githubUI.githubBoards.getSelectedRepo();
+            const user = githubUI.githubBoards.api?.user;
             const repoName = repo?.fullName || repo?.name || 'not selected';
             el.innerHTML = `<i class="fas fa-check-circle"></i> Connected as <strong>@${user?.login || 'unknown'}</strong> to <code>${repoName}</code>`;
         } else {

@@ -35,6 +35,8 @@ class KanbanBoard {
             status: data.status || 'backlog',
             dueDate: data.dueDate || '',
             milestone: data.milestone || null, // { name: string, number: number } or null
+            project: data.project || null,   // { id: string, title: string } or null
+            parentIssueId: data.parentIssueId || null,
             labels: data.labels || [], // Array of label names
             backgroundColor: data.backgroundColor || '#2d2d2d',
             attachments: data.attachments || [], // Array of {type, url, name}
@@ -603,12 +605,33 @@ class KanbanBoard {
         this.populateAssigneeDropdown();
         await this.populateMilestoneDropdown();
         await this.populateLabelsDropdown();
+        await this.populateProjectDropdown();
 
         // Set milestone after populating dropdown
         if (task && milestoneSelect) {
             milestoneSelect.value = task.milestone ? task.milestone.name || task.milestone : '';
         } else if (milestoneSelect) {
             milestoneSelect.value = '';
+        }
+
+        // Set project after populating dropdown
+        const projectSelect = document.getElementById('task-project');
+        if (task && projectSelect) {
+            if (task.project && task.project.id) {
+                projectSelect.value = task.project.id;
+            } else if (task.projectId) {
+                projectSelect.value = task.projectId;
+            }
+        } else if (projectSelect) {
+            projectSelect.value = '';
+        }
+
+        // Set parent issue field
+        const parentIssueInput = document.getElementById('task-parent-issue');
+        if (task && parentIssueInput) {
+            parentIssueInput.value = task.parentIssueId || '';
+        } else if (parentIssueInput) {
+            parentIssueInput.value = '';
         }
 
         // Set labels after populating dropdown
@@ -1351,6 +1374,24 @@ class KanbanBoard {
                 number: parseInt(selectedOption.dataset.number) || null
             };
         }
+
+        // Get project value
+        const projectSelect = document.getElementById('task-project');
+        let project = null;
+        if (projectSelect && projectSelect.value) {
+            project = {
+                id: projectSelect.value,
+                title: projectSelect.selectedOptions[0].textContent
+            };
+        }
+
+        // Get parent issue value
+        const parentIssueInput = document.getElementById('task-parent-issue');
+        let parentIssueId = null;
+        if (parentIssueInput && parentIssueInput.value) {
+            const parsed = parseInt(parentIssueInput.value);
+            if (!isNaN(parsed)) parentIssueId = parsed;
+        }
         
         // Get form values directly
         const taskData = {
@@ -1361,6 +1402,8 @@ class KanbanBoard {
             priority: document.getElementById('task-priority').value,
             dueDate: document.getElementById('task-due-date').value,
             milestone: milestone,
+            project: project,
+            parentIssueId: parentIssueId,
             backgroundColor: document.getElementById('task-bg-color').value,
             attachments: this.currentAttachments || [],
             labels: this.getSelectedLabels()
@@ -1471,6 +1514,60 @@ class KanbanBoard {
             console.warn('Failed to load milestones:', error);
             select.disabled = true;
             select.title = 'Failed to load milestones';
+        }
+    }
+
+    // GitHub Projects Integration
+    async populateProjectDropdown() {
+        const select = document.getElementById('task-project');
+        if (!select) return;
+
+        const currentValue = select.value;
+
+        // Clear existing options except the first one
+        select.innerHTML = '<option value="">No Project</option>';
+
+        // Disable if GitHub integration not active
+        if (!window.githubBoardsUI || !window.githubBoardsUI.githubBoards.isConnected()) {
+            select.disabled = true;
+            select.title = 'Connect to GitHub to use projects';
+            return;
+        }
+
+        const repo = window.githubBoardsUI.githubBoards.getSelectedRepo();
+        if (!repo) {
+            select.disabled = true;
+            select.title = 'Select a repository to use projects';
+            return;
+        }
+
+        select.disabled = false;
+        select.title = '';
+
+        try {
+            const projects = await window.githubBoardsUI.githubBoards.api.getProjects();
+            if (!projects || projects.length === 0) {
+                select.disabled = true;
+                select.title = 'No projects found in this repository';
+                return;
+            }
+
+            projects.forEach(proj => {
+                const option = document.createElement('option');
+                option.value = proj.id;
+                option.textContent = proj.title;
+                // Store number if available (for classic projects)
+                option.dataset.number = proj.number || '';
+                select.appendChild(option);
+            });
+
+            // Restore selection if editing
+            select.value = currentValue;
+
+        } catch (error) {
+            console.warn('Failed to load projects:', error);
+            select.disabled = true;
+            select.title = 'Failed to load projects';
         }
     }
 

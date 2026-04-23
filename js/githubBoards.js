@@ -691,6 +691,8 @@ class GitHubBoards {
                     assignee: assignee,
                     dueDate: taskData.dueDate || '',
                     milestone: milestone,
+                    project: taskData.project || null,
+                    parentIssueId: taskData.parentIssueId || null,
                     labels: labels,
                     comments: taskData.comments || [],
                     attachments: taskData.attachments || [],
@@ -809,6 +811,15 @@ class GitHubBoards {
             body += `\n\n**Milestone:** ${task.milestone.name}`;
         }
         
+        if (task.project && task.project.title) {
+            body += `\n\n**Project:** ${task.project.title}`;
+        }
+        
+        // Mention parent issue if set to create a visible link in GitHub
+        if (task.parentIssueId) {
+            body += `\n\n**Parent Issue:** #${task.parentIssueId}`;
+        }
+        
         // Add metadata as JSON for parsing on pull
         const metadata = {
             _pixelKanban: true,
@@ -816,6 +827,8 @@ class GitHubBoards {
             dueDate: task.dueDate,
             milestone: task.milestone || null,
             labels: task.labels || [],
+            project: task.project || null,
+            parentIssueId: task.parentIssueId || null,
             description: task.description,
             comments: task.comments || [],
             attachments: task.attachments || []
@@ -1260,6 +1273,44 @@ class GitHubBoardsUI {
         this.updateSyncStatus();
     }
 
+    /**
+     * Guess the current site's repository based on the URL.
+     * Works for GitHub Pages deployments (user or project sites).
+     */
+    guessCurrentSiteRepo() {
+        try {
+            const hostname = window.location.hostname;
+            // Only attempt on GitHub Pages domains
+            if (!hostname.includes('github.io')) {
+                return null;
+            }
+            
+            // Extract owner from hostname: e.g., 'username' from 'username.github.io'
+            const hostParts = hostname.split('.');
+            const owner = hostParts[0]; // 'username'
+            
+            // Determine repo from path
+            const pathParts = window.location.pathname.split('/').filter(Boolean);
+            let repo;
+            if (pathParts.length > 0) {
+                // Project site: https://username.github.io/repo/
+                repo = pathParts[0];
+            } else {
+                // User site: https://username.github.io/ -> repo is username.github.io
+                repo = `${owner}.github.io`;
+            }
+            
+            return {
+                owner: { login: owner },
+                name: repo,
+                fullName: `${owner}/${repo}`
+            };
+        } catch (e) {
+            console.warn('Failed to guess current site repo:', e);
+            return null;
+        }
+    }
+
     async loadRepositories() {
         const repoSelect = document.getElementById('github-repo-select');
         if (!repoSelect) return;
@@ -1270,6 +1321,7 @@ class GitHubBoardsUI {
             repoSelect.innerHTML = '<option value="">Select a repository...</option>';
             
             const savedRepo = this.githubBoards.getSelectedRepo();
+            let selected = false;
             
             repos.forEach(repo => {
                 const option = document.createElement('option');
@@ -1282,11 +1334,40 @@ class GitHubBoardsUI {
                 
                 if (savedRepo && savedRepo.fullName === repo.full_name) {
                     option.selected = true;
+                    selected = true;
                     this.enableSyncButtons();
                 }
                 
                 repoSelect.appendChild(option);
             });
+            
+            // If no repo selected yet, try to auto-detect based on current site URL
+            if (!selected && !savedRepo) {
+                const guessed = this.guessCurrentSiteRepo();
+                if (guessed) {
+                    // Find matching repo in the list
+                    const match = repos.find(r => 
+                        r.owner.login === guessed.owner.login && r.name === guessed.name
+                    );
+                    if (match) {
+                        // Select this repo
+                        this.githubBoards.selectRepo({
+                            owner: { login: match.owner.login },
+                            name: match.name,
+                            fullName: match.full_name
+                        });
+                        // Update select UI
+                        repoSelect.value = JSON.stringify({
+                            owner: { login: match.owner.login },
+                            name: match.name,
+                            fullName: match.full_name
+                        });
+                        selected = true;
+                        this.enableSyncButtons();
+                        console.log(`Auto-selected repository: ${match.full_name} based on site URL`);
+                    }
+                }
+            }
             
         } catch (error) {
             this.showStatus('Failed to load repositories: ' + error.message, 'error');
